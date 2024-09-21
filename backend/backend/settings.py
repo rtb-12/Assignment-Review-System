@@ -53,7 +53,7 @@ SIMPLE_JWT = {
     'SIGNING_KEY': SIGNING_KEY,
     'VERIFYING_KEY': None,
     'AUTH_HEADER_TYPES': ('Bearer',),
-    'USER_ID_FIELD': 'user_id',  # Ensure this matches your primary key field
+    'USER_ID_FIELD': 'user_id', 
     'USER_ID_CLAIM': 'user_id',
     'AUTH_TOKEN_CLASSES': ('rest_framework_simplejwt.tokens.AccessToken',),
     'TOKEN_TYPE_CLAIM': 'token_type',

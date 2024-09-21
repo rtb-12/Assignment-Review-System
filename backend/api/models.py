@@ -1,5 +1,7 @@
 # models.py
 from django.db import models
+from django.utils import timezone
+from datetime import timedelta
 
 class UserDetails(models.Model):
     user_id = models.AutoField(primary_key=True)
@@ -17,3 +19,44 @@ class UserDetails(models.Model):
 
     def __str__(self):
         return self.name
+
+class WorkspaceDetail(models.Model):
+    workspace_name = models.CharField(max_length=255)
+    workspace_logo_image = models.ImageField(upload_to='workspace_logos/', null=True, blank=True)
+    workspace_description = models.TextField()
+    workspace_id = models.AutoField(primary_key=True)
+    invitation_token = models.CharField(max_length=255, unique=True, null=True, blank=True)
+    token_created_at = models.DateTimeField(null=True, blank=True)
+    token_expires_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'WorkspaceDetail'
+        indexes = [
+            models.Index(fields=['workspace_name', 'workspace_logo_image', 'workspace_description', 'workspace_id'], name='workspace_detail_idx'),
+        ]
+
+    def __str__(self):
+        return self.workspace_name
+
+    def generate_invitation_token(self):
+        self.invitation_token = str(uuid.uuid4())
+        self.token_created_at = timezone.now()
+        self.token_expires_at = self.token_created_at + timedelta(days=1)
+        self.save()
+
+    def is_token_expired(self):
+        return timezone.now() > self.token_expires_at
+
+class WorkspaceMembers(models.Model):
+    workspace_id = models.ForeignKey(WorkspaceDetail, on_delete=models.CASCADE, db_column='workspace_id')
+    user_id = models.ForeignKey(UserDetails, on_delete=models.CASCADE, db_column='user_id')
+    workspace_role = models.CharField(max_length=255)
+
+    class Meta:
+        db_table = 'WorkspaceMembers'
+        indexes = [
+            models.Index(fields=['workspace_id', 'user_id', 'workspace_role'], name='workspace_members_idx'),
+        ]
+
+    def __str__(self):
+        return f"{self.workspace_id} - {self.user_id} - {self.workspace_role}"
