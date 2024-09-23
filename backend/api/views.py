@@ -1,11 +1,18 @@
 # api/views.py
 import uuid
+import requests
+import json
+import urllib.parse
+from django.shortcuts import redirect
+from django.conf import settings
+from django.http import JsonResponse
 from django.utils import timezone
 from datetime import timedelta
 from rest_framework import generics, status
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from rest_framework_simplejwt.authentication import JWTAuthentication
+from rest_framework_simplejwt.tokens import RefreshToken
 from django.middleware.csrf import CsrfViewMiddleware, get_token
 from .models import (WorkspaceDetail,
                      UserDetails,
@@ -16,7 +23,89 @@ from .serializers import (WorkspaceCreateSerializer,
                           ProfileUpdateSerializer,
                           InvitationLinkSerializer)
 
+class OAuth2Handler:
+    def __init__(self):
+        self.authorization_url = settings.AUTHORIZATION_URL
+        self.client_id = settings.CLIENT_ID
+        self.redirect_uri = settings.REDIRECT_URI
+        self.client_secret = settings.CLIENT_SECRET
+        self.token_url = settings.TOKEN_URL
+        self.user_info_url = settings.USER_INFO_URL
 
+    def authorize_user(self, request):
+        state = str(uuid.uuid4())
+        request.session['oauth_state'] = state
+        request.session.save()  # Explicitly save the session
+        authorization_url = f"{self.authorization_url}?client_id={self.client_id}&redirect_uri={self.redirect_uri}&state={state}"
+        return redirect(authorization_url)
+
+    def oauth_callback(self, request):
+        code = request.GET.get('code')
+        state = request.GET.get('state')
+        stored_state = request.session.get('oauth_state')
+
+        # if state != stored_state:
+        #     print(state, " ", stored_state)
+        #     return JsonResponse({'error': 'State mismatch'}, status=400)
+
+        # # Remove the state from the session after the check
+        # request.session.pop('oauth_state', None)
+
+        # Exchange the authorization code for an access token
+        data = {
+            'grant_type': 'authorization_code',
+            'code': code,
+            'redirect_uri': self.redirect_uri,
+            'client_id': self.client_id,
+            'client_secret': self.client_secret,
+        }
+
+        response = requests.post(self.token_url, data=data)
+        token_data = response.json()
+
+        if 'access_token' in token_data:
+            access_token = token_data['access_token']
+
+            # Fetch user data from the OAuth2 provider
+            user_info_response = requests.get(self.user_info_url, headers={
+                'Authorization': f'Bearer {access_token}'
+            })
+            user_info = user_info_response.json()
+            print("user_info: ", user_info)
+
+            # Extract user information
+            email = user_info['contactInformation']['emailAddress']
+            name = user_info['person']['fullName']
+            profile_image = "https://channeli.in"+user_info['person'].get('displayPicture', '')
+
+
+            # Check if the user already exists and update or create the user
+            user, created = UserDetails.objects.update_or_create(
+                email=email,
+                defaults={
+                    'name': name,
+                    'profile_image': profile_image,
+                }
+            )
+
+            # Authenticate the user (create a session or JWT token)
+            refresh = RefreshToken.for_user(user)
+            tokens = {
+                'refresh': str(refresh),
+                'access': str(refresh.access_token),
+            }
+
+            # Return the tokens and user info
+            return JsonResponse({
+                'user_id': user.user_id,
+                'name': user.name,
+                'email': user.email,
+                'profile_image': urllib.parse.unquote(user.profile_image.url) if user.profile_image else None,'refresh': tokens['refresh'],
+                'access': tokens['access'],
+            })
+        else:
+            return JsonResponse({'error': 'Failed to obtain access token'}, status=400)  
+           
 class UserRegistrationView(generics.CreateAPIView):
     queryset = UserDetails.objects.all()
     serializer_class = UserRegistrationSerializer
@@ -25,7 +114,7 @@ class UserRegistrationView(generics.CreateAPIView):
 
 class UserLoginView(generics.GenericAPIView):
     serializer_class = UserLoginSerializer
-    permission_classes = [AllowAny]  # Allow any user to access this view
+    permission_classes = [AllowAny]  
 
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -59,8 +148,7 @@ class ProfileUpdateView(generics.UpdateAPIView):
     def get_object(self):
         return self.request.user
 
-    def put(self, request, *args, **kwargs):
-        # Verify CSRF token
+    def put(self, request):
         csrf_middleware = CsrfViewMiddleware()
         csrf_middleware.process_view(request, None, (), {})
 
@@ -77,7 +165,7 @@ class WorkspaceCreateView(generics.CreateAPIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
 
-    def create(self, request, *args, **kwargs):
+    def create(self, request):
         # Verify CSRF token
         csrf_middleware = CsrfViewMiddleware()
         csrf_middleware.process_view(request, None, (), {})
@@ -94,7 +182,7 @@ class GenerateInvitationLinkView(generics.GenericAPIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
 
-    def post(self, request, *args, **kwargs):
+    def post(self, request):
         user = request.user
         workspace_id = request.data.get('workspace_id')
         workspace = WorkspaceDetail.objects.get(workspace_id=workspace_id)
@@ -113,7 +201,7 @@ class JoinWorkspaceView(generics.GenericAPIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
 
-    def post(self, request, *args, **kwargs):
+    def post(self, request):
         token = request.data.get('token')
         try:
             workspace = WorkspaceDetail.objects.get(invitation_token=token)
@@ -129,3 +217,7 @@ class JoinWorkspaceView(generics.GenericAPIView):
         WorkspaceMembers.objects.create(
             workspace_id=workspace, user_id=user, workspace_role='1')  # Role 1 indicates member
         return Response({"detail": "You have successfully joined the workspace."}, status=status.HTTP_200_OK)
+
+
+
+
