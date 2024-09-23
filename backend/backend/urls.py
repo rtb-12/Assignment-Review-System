@@ -9,7 +9,12 @@ from api.views import (
     WorkspaceCreateView,
     GenerateInvitationLinkView,
     JoinWorkspaceView,
+    OAuth2Handler
 )
+
+oauth_handler = OAuth2Handler()
+
+
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/user/register/', UserRegistrationView.as_view(), name='register'),
@@ -18,4 +23,6 @@ urlpatterns = [
     path('api/workspace/create/', WorkspaceCreateView.as_view(), name='create-workspace'),
     path('api/workspace/generate-invitation/', GenerateInvitationLinkView.as_view(), name='generate-invitation'),
     path('api/workspace/join/', JoinWorkspaceView.as_view(), name='join-workspace'),
+    path('oauth/authorize/', oauth_handler.authorize_user, name='authorize_user'),
+    path('callback/', oauth_handler.oauth_callback, name='oauth_callback'),
 ]
