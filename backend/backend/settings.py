@@ -18,6 +18,8 @@ from django.core.management.utils import get_random_secret_key
 
 load_dotenv()
 
+AUTH_USER_MODEL = 'api.UserDetails'
+
 # Use environment variables
 AUTHORIZATION_URL = os.getenv('AUTHORIZATION_URL')
 TOKEN_URL = os.getenv('TOKEN_URL')
@@ -32,7 +34,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
-SESSION_ENGINE = 'django.contrib.sessions.backends.db' 
+SESSION_ENGINE = 'django.contrib.sessions.backends.db'
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = "django-insecure-n400n4o*-d(2(3e5&54dc-kj)oov!sq$q+e$3i7t*913=0)8%p"
@@ -54,15 +56,15 @@ REST_FRAMEWORK = {
 SIGNING_KEY = os.getenv('JWT_SIGNING_KEY', get_random_secret_key())
 
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=5),
-    'REFRESH_TOKEN_LIFETIME': timedelta(hours=12),
+    'ACCESS_TOKEN_LIFETIME': timedelta(hours=48),
+    'REFRESH_TOKEN_LIFETIME': timedelta(hours=60),
     'ROTATE_REFRESH_TOKENS': True,
     'BLACKLIST_AFTER_ROTATION': True,
     'ALGORITHM': 'HS256',
     'SIGNING_KEY': SIGNING_KEY,
     'VERIFYING_KEY': None,
     'AUTH_HEADER_TYPES': ('Bearer',),
-    'USER_ID_FIELD': 'user_id', 
+    'USER_ID_FIELD': 'user_id',
     'USER_ID_CLAIM': 'user_id',
     'AUTH_TOKEN_CLASSES': ('rest_framework_simplejwt.tokens.AccessToken',),
     'TOKEN_TYPE_CLAIM': 'token_type',
@@ -154,7 +156,6 @@ AUTH_PASSWORD_VALIDATORS = [
 AUTHENTICATION_BACKENDS = (
     'django.contrib.auth.backends.ModelBackend',
 )
-
 
 
 # Internationalization

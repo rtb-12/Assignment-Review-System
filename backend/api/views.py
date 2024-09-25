@@ -23,6 +23,7 @@ from .serializers import (WorkspaceCreateSerializer,
                           ProfileUpdateSerializer,
                           InvitationLinkSerializer)
 
+
 class OAuth2Handler:
     def __init__(self):
         self.authorization_url = settings.AUTHORIZATION_URL
@@ -76,8 +77,8 @@ class OAuth2Handler:
             # Extract user information
             email = user_info['contactInformation']['emailAddress']
             name = user_info['person']['fullName']
-            profile_image = "https://channeli.in"+user_info['person'].get('displayPicture', '')
-
+            profile_image = "https://channeli.in" + \
+                user_info['person'].get('displayPicture', '')
 
             # Check if the user already exists and update or create the user
             user, created = UserDetails.objects.update_or_create(
@@ -100,21 +101,22 @@ class OAuth2Handler:
                 'user_id': user.user_id,
                 'name': user.name,
                 'email': user.email,
-                'profile_image': urllib.parse.unquote(user.profile_image.url) if user.profile_image else None,'refresh': tokens['refresh'],
+                'profile_image': urllib.parse.unquote(user.profile_image.url) if user.profile_image else None, 'refresh': tokens['refresh'],
                 'access': tokens['access'],
             })
         else:
-            return JsonResponse({'error': 'Failed to obtain access token'}, status=400)  
-           
+            return JsonResponse({'error': 'Failed to obtain access token'}, status=400)
+
+
 class UserRegistrationView(generics.CreateAPIView):
     queryset = UserDetails.objects.all()
     serializer_class = UserRegistrationSerializer
-    permission_classes = [AllowAny]  
+    permission_classes = [AllowAny]
 
 
 class UserLoginView(generics.GenericAPIView):
     serializer_class = UserLoginSerializer
-    permission_classes = [AllowAny]  
+    permission_classes = [AllowAny]
 
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -166,10 +168,6 @@ class WorkspaceCreateView(generics.CreateAPIView):
     authentication_classes = [JWTAuthentication]
 
     def create(self, request):
-        # Verify CSRF token
-        csrf_middleware = CsrfViewMiddleware()
-        csrf_middleware.process_view(request, None, (), {})
-
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         self.perform_create(serializer)
@@ -188,6 +186,7 @@ class GenerateInvitationLinkView(generics.GenericAPIView):
         workspace = WorkspaceDetail.objects.get(workspace_id=workspace_id)
 
         # Check if the user is an admin of the workspace
+        # Pass the user instance instead of user.id
         if not WorkspaceMembers.objects.filter(workspace_id=workspace, user_id=user, workspace_role='2').exists():
             return Response({"detail": "You do not have permission to generate an invitation link for this workspace."}, status=status.HTTP_403_FORBIDDEN)
 
@@ -197,6 +196,7 @@ class GenerateInvitationLinkView(generics.GenericAPIView):
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
+# backend/api/views.py
 class JoinWorkspaceView(generics.GenericAPIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
@@ -215,9 +215,12 @@ class JoinWorkspaceView(generics.GenericAPIView):
 
         # Add the user to the workspace
         WorkspaceMembers.objects.create(
-            workspace_id=workspace, user_id=user, workspace_role='1')  # Role 1 indicates member
+            workspace_id=workspace, user_id=user.id, workspace_role='1')  # Use user.id instead of user.user_id
         return Response({"detail": "You have successfully joined the workspace."}, status=status.HTTP_200_OK)
 
 
-
-
+class WorkspaceListView(generics.ListAPIView):
+    queryset = WorkspaceDetail.objects.all()
+    serializer_class = WorkspaceCreateSerializer
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
