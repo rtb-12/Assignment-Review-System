@@ -2,37 +2,68 @@
 from django.db import models
 from django.utils import timezone
 from datetime import timedelta
+from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 
-class UserDetails(models.Model):
+
+class UserDetailsManager(BaseUserManager):
+    def create_user(self, email, name, password=None, **extra_fields):
+        if not email:
+            raise ValueError('The Email field must be set')
+        email = self.normalize_email(email)
+        user = self.model(email=email, name=name, **extra_fields)
+        user.set_password(password)
+        user.save(using=self._db)
+        return user
+
+    def create_superuser(self, email, name, password=None, **extra_fields):
+        extra_fields.setdefault('is_staff', True)
+        extra_fields.setdefault('is_superuser', True)
+
+        return self.create_user(email, name, password, **extra_fields)
+
+
+class UserDetails(AbstractBaseUser, PermissionsMixin):
     user_id = models.AutoField(primary_key=True)
     name = models.CharField(max_length=255)
     email = models.EmailField(unique=True)
-    password_hash = models.CharField(max_length=255)
-    profile_image = models.ImageField(upload_to='profile_images/', null=True, blank=True)
+    # Rename password_hash to password
+    password = models.CharField(max_length=255)
+    profile_image = models.ImageField(
+        upload_to='profile_images/', null=True, blank=True)
     user_details = models.TextField()
+
+    USERNAME_FIELD = 'email'
+    REQUIRED_FIELDS = ['name']
+
+    objects = UserDetailsManager()
 
     class Meta:
         db_table = 'UserDetails'
         indexes = [
-            models.Index(fields=['name', 'email', 'password_hash', 'profile_image', 'user_details'], name='user_details_idx'),
+            models.Index(fields=['name', 'email', 'password',
+                         'profile_image', 'user_details'], name='user_details_idx'),
         ]
 
     def __str__(self):
         return self.name
 
+
 class WorkspaceDetail(models.Model):
     workspace_name = models.CharField(max_length=255)
-    workspace_logo_image = models.ImageField(upload_to='workspace_logos/', null=True, blank=True)
+    workspace_logo_image = models.ImageField(
+        upload_to='workspace_logos/', null=True, blank=True)
     workspace_description = models.TextField()
     workspace_id = models.AutoField(primary_key=True)
-    invitation_token = models.CharField(max_length=255, unique=True, null=True, blank=True)
+    invitation_token = models.CharField(
+        max_length=255, unique=True, null=True, blank=True)
     token_created_at = models.DateTimeField(null=True, blank=True)
     token_expires_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         db_table = 'WorkspaceDetail'
         indexes = [
-            models.Index(fields=['workspace_name', 'workspace_logo_image', 'workspace_description', 'workspace_id'], name='workspace_detail_idx'),
+            models.Index(fields=['workspace_name', 'workspace_logo_image',
+                         'workspace_description', 'workspace_id'], name='workspace_detail_idx'),
         ]
 
     def __str__(self):
@@ -47,15 +78,19 @@ class WorkspaceDetail(models.Model):
     def is_token_expired(self):
         return timezone.now() > self.token_expires_at
 
+
 class WorkspaceMembers(models.Model):
-    workspace_id = models.ForeignKey(WorkspaceDetail, on_delete=models.CASCADE, db_column='workspace_id')
-    user_id = models.ForeignKey(UserDetails, on_delete=models.CASCADE, db_column='user_id')
+    workspace_id = models.ForeignKey(
+        WorkspaceDetail, on_delete=models.CASCADE, db_column='workspace_id')
+    user_id = models.ForeignKey(
+        UserDetails, on_delete=models.CASCADE, db_column='user_id')
     workspace_role = models.CharField(max_length=255)
 
     class Meta:
         db_table = 'WorkspaceMembers'
         indexes = [
-            models.Index(fields=['workspace_id', 'user_id', 'workspace_role'], name='workspace_members_idx'),
+            models.Index(fields=['workspace_id', 'user_id',
+                         'workspace_role'], name='workspace_members_idx'),
         ]
 
     def __str__(self):
