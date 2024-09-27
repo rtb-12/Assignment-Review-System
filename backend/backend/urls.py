@@ -11,6 +11,8 @@ from api.views import (
     JoinWorkspaceView,
     OAuth2Handler,
     WorkspaceListView,
+    TokenRefreshView,
+    WorkspaceAccessView,
 )
 
 oauth_handler = OAuth2Handler()
@@ -24,10 +26,13 @@ urlpatterns = [
          ProfileUpdateView.as_view(), name='update-profile'),
     path('api/workspace/create/', WorkspaceCreateView.as_view(),
          name='create-workspace'),
-    path('api/workspace/generate-invitation/',
+    path('api/workspace/generate-invitation/<int:workspace_id>/',
          GenerateInvitationLinkView.as_view(), name='generate-invitation'),
     path('api/workspace/join/', JoinWorkspaceView.as_view(), name='join-workspace'),
     path('api/workspace/list/', WorkspaceListView.as_view(), name='list-workspaces'),
+    path('api/workspace/access/<int:workspace_id>/',
+         WorkspaceAccessView.as_view(), name='workspace-access'),
+    path('api/token/refresh/', TokenRefreshView.as_view(), name='token-refresh'),
     path('oauth/authorize/', oauth_handler.authorize_user, name='authorize_user'),
     path('callback/', oauth_handler.oauth_callback, name='oauth_callback'),
 

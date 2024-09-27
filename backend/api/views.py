@@ -21,7 +21,10 @@ from .serializers import (WorkspaceCreateSerializer,
                           UserRegistrationSerializer,
                           UserLoginSerializer,
                           ProfileUpdateSerializer,
-                          InvitationLinkSerializer)
+                          InvitationLinkSerializer,
+                          TokenRefreshSerializer,
+                          UserProfileSerializer
+                          )
 
 
 class OAuth2Handler:
@@ -180,23 +183,21 @@ class GenerateInvitationLinkView(generics.GenericAPIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
 
-    def post(self, request):
+    def post(self, request, workspace_id):
         user = request.user
-        workspace_id = request.data.get('workspace_id')
-        workspace = WorkspaceDetail.objects.get(workspace_id=workspace_id)
+        try:
+            workspace = WorkspaceDetail.objects.get(workspace_id=workspace_id)
+        except WorkspaceDetail.DoesNotExist:
+            return Response({"detail": "Workspace not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        # Check if the user is an admin of the workspace
-        # Pass the user instance instead of user.id
         if not WorkspaceMembers.objects.filter(workspace_id=workspace, user_id=user, workspace_role='2').exists():
             return Response({"detail": "You do not have permission to generate an invitation link for this workspace."}, status=status.HTTP_403_FORBIDDEN)
 
-        # Generate the invitation token
         workspace.generate_invitation_token()
         serializer = self.get_serializer(workspace)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
-# backend/api/views.py
 class JoinWorkspaceView(generics.GenericAPIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
@@ -213,9 +214,8 @@ class JoinWorkspaceView(generics.GenericAPIView):
 
         user = request.user
 
-        # Add the user to the workspace
         WorkspaceMembers.objects.create(
-            workspace_id=workspace, user_id=user.id, workspace_role='1')  # Use user.id instead of user.user_id
+            workspace_id=workspace, user_id=user, workspace_role='1')  # Pass the user instance instead of user.user_id
         return Response({"detail": "You have successfully joined the workspace."}, status=status.HTTP_200_OK)
 
 
@@ -224,3 +224,39 @@ class WorkspaceListView(generics.ListAPIView):
     serializer_class = WorkspaceCreateSerializer
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
+
+
+class TokenRefreshView(generics.GenericAPIView):
+    serializer_class = TokenRefreshSerializer
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        return Response(serializer.validated_data, status=status.HTTP_200_OK)
+
+
+class WorkspaceAccessView(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+
+    def get(self, request, workspace_id):
+        try:
+            workspace = WorkspaceDetail.objects.get(workspace_id=workspace_id)
+        except WorkspaceDetail.DoesNotExist:
+            return Response({"detail": "Workspace not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        user = request.user
+        try:
+            membership = WorkspaceMembers.objects.get(
+                workspace_id=workspace, user_id=user)
+        except WorkspaceMembers.DoesNotExist:
+            return Response({"detail": "You are not a member of this workspace."}, status=status.HTTP_403_FORBIDDEN)
+
+        user_details = UserProfileSerializer(user).data
+        workspace_details = WorkspaceCreateSerializer(workspace).data
+
+        if membership.workspace_role == '2':  # Role 2 indicates admin
+            return Response({"detail": "Admin view", "workspace": workspace_details, "user": user_details}, status=status.HTTP_200_OK)
+        else:
+            return Response({"detail": "Member view", "workspace": workspace_details, "user": user_details}, status=status.HTTP_200_OK)

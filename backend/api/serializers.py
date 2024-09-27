@@ -9,21 +9,21 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = UserDetails
-        fields = ["user_id", "name", "email", "password_hash", "retype"]
+        fields = ["user_id", "name", "email", "password", "retype"]
         extra_kwargs = {
-            "password_hash": {"write_only": True},
+            "password": {"write_only": True},
             "retype": {"write_only": True},
         }
 
     def validate(self, data):
-        if data["password_hash"] != data["retype"]:
+        if data["password"] != data["retype"]:
             raise serializers.ValidationError("Passwords do not match.")
         return data
 
     def create(self, validated_data):
         validated_data.pop("retype")
-        validated_data["password_hash"] = make_password(
-            validated_data["password_hash"])
+        validated_data["password"] = make_password(
+            validated_data["password"])
         user = UserDetails.objects.create(**validated_data)
         return user
 
@@ -38,7 +38,7 @@ class UserLoginSerializer(serializers.Serializer):
         except UserDetails.DoesNotExist:
             raise serializers.ValidationError("Invalid email or password.")
 
-        if not check_password(data["password"], user.password_hash):
+        if not check_password(data["password"], user.password):
             raise serializers.ValidationError("Invalid email or password.")
 
         return user
@@ -64,6 +64,13 @@ class ProfileUpdateSerializer(serializers.ModelSerializer):
         fields = ['profile_image', 'user_details']
 
 
+class InvitationLinkSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = WorkspaceDetail
+        fields = ['workspace_id', 'invitation_token',
+                  'token_created_at', 'token_expires_at']
+
+
 class WorkspaceCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = WorkspaceDetail
@@ -81,15 +88,14 @@ class WorkspaceCreateSerializer(serializers.ModelSerializer):
         return workspace
 
 
-class InvitationLinkSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = WorkspaceDetail
-        fields = ['workspace_id', 'invitation_token',
-                  'token_created_at', 'token_expires_at']
+class TokenRefreshSerializer(serializers.Serializer):
+    refresh = serializers.CharField()
 
-
-class WorkspaceCreateSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = WorkspaceDetail
-        fields = ['workspace_name', 'workspace_logo_image', 'workspace_description',
-                  'workspace_id', 'invitation_token', 'token_created_at', 'token_expires_at']
+    def validate(self, attrs):
+        refresh = attrs['refresh']
+        try:
+            refresh_token = RefreshToken(refresh)
+            access_token = str(refresh_token.access_token)
+            return {'access': access_token}
+        except Exception as e:
+            raise serializers.ValidationError('Invalid refresh token')
