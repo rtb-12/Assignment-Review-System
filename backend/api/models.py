@@ -96,3 +96,38 @@ class WorkspaceMembers(models.Model):
 
     def __str__(self):
         return f"{self.workspace_id} - {self.user_id} - {self.workspace_role}"
+
+
+class GroupDetails(models.Model):
+    groupID = models.AutoField(primary_key=True)
+    GroupName = models.CharField(max_length=255)
+    description = models.TextField()
+    groupProfileImage = models.ImageField(
+        upload_to='group_profile_images/', null=True, blank=True)
+
+    class Meta:
+        db_table = 'GroupDetails'
+        indexes = [
+            models.Index(fields=['groupID', 'GroupName', 'description',
+                         'groupProfileImage'], name='group_details_idx'),
+        ]
+
+    def __str__(self):
+        return self.GroupName
+
+
+class GroupMembers(models.Model):
+    userID = models.ForeignKey(
+        UserDetails, on_delete=models.CASCADE, db_column='userID')
+    groupID = models.ForeignKey(
+        GroupDetails, on_delete=models.CASCADE, db_column='groupID')
+
+    class Meta:
+        db_table = 'GroupMembers'
+        indexes = [
+            models.Index(fields=['userID', 'groupID'],
+                         name='group_members_idx'),
+        ]
+
+    def __str__(self):
+        return f"{self.userID} - {self.groupID}"
