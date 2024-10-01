@@ -1,7 +1,8 @@
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth.hashers import make_password, check_password
 from rest_framework import serializers
-from .models import UserDetails, WorkspaceDetail, WorkspaceMembers
+from .models import (UserDetails, WorkspaceDetail,
+                     WorkspaceMembers, GroupDetails, GroupMembers)
 
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
@@ -99,3 +100,40 @@ class TokenRefreshSerializer(serializers.Serializer):
             return {'access': access_token}
         except Exception as e:
             raise serializers.ValidationError('Invalid refresh token')
+
+
+class GroupCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = GroupDetails
+        fields = ['GroupName', 'description', 'groupProfileImage']
+
+    def create(self, validated_data):
+        group = GroupDetails.objects.create(**validated_data)
+        return group
+
+
+class AddGroupMemberSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = GroupMembers
+        fields = ['groupID', 'userID']
+
+    def validate(self, data):
+        user = data['userID']
+        group_id = data['groupID']
+
+        try:
+            group = GroupDetails.objects.get(pk=group_id)
+        except GroupDetails.DoesNotExist:
+            raise serializers.ValidationError("Group not found.")
+
+        workspace = group.workspace_id
+
+        if not WorkspaceMembers.objects.filter(workspace_id=workspace, user_id=user).exists():
+            raise serializers.ValidationError(
+                "User is not a member of the workspace.")
+
+        return data
+
+    def create(self, validated_data):
+        group_member = GroupMembers.objects.create(**validated_data)
+        return group_member

@@ -14,17 +14,18 @@ from rest_framework.response import Response
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.middleware.csrf import CsrfViewMiddleware, get_token
-from .models import (WorkspaceDetail,
+from .models import (GroupDetails, WorkspaceDetail,
                      UserDetails,
-                     WorkspaceMembers)
-from .serializers import (WorkspaceCreateSerializer,
+                     WorkspaceMembers,
+                     GroupMembers)
+from .serializers import (AddGroupMemberSerializer, WorkspaceCreateSerializer,
                           UserRegistrationSerializer,
                           UserLoginSerializer,
                           ProfileUpdateSerializer,
                           InvitationLinkSerializer,
                           TokenRefreshSerializer,
-                          UserProfileSerializer
-                          )
+                          UserProfileSerializer,
+                          GroupCreateSerializer)
 
 
 class OAuth2Handler:
@@ -260,3 +261,58 @@ class WorkspaceAccessView(generics.GenericAPIView):
             return Response({"detail": "Admin view", "workspace": workspace_details, "user": user_details}, status=status.HTTP_200_OK)
         else:
             return Response({"detail": "Member view", "workspace": workspace_details, "user": user_details}, status=status.HTTP_200_OK)
+
+
+# backend/api/views.py
+
+class GroupCreateView(generics.CreateAPIView):
+    serializer_class = GroupCreateSerializer
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+
+    def create(self, request, workspace_id):
+        user = request.user
+        try:
+            workspace = WorkspaceDetail.objects.get(workspace_id=workspace_id)
+        except WorkspaceDetail.DoesNotExist:
+            return Response({"detail": "Workspace not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if not WorkspaceMembers.objects.filter(workspace_id=workspace, user_id=user, workspace_role='2').exists():
+            return Response({"detail": "You do not have permission to create a group in this workspace."}, status=status.HTTP_403_FORBIDDEN)
+
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        group = serializer.save()
+
+        GroupMembers.objects.create(userID=user, groupID=group)
+
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
+
+# backend/api/views.py
+
+class AddGroupMemberView(generics.CreateAPIView):
+    serializer_class = AddGroupMemberSerializer
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+
+    def create(self, request, group_id):
+        user = request.user
+        try:
+            group = GroupDetails.objects.get(groupID=group_id)
+        except GroupDetails.DoesNotExist:
+            return Response({"detail": "Group not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        workspace = group.workspace_id
+
+        # Check if the requester is an admin of the workspace
+        if not WorkspaceMembers.objects.filter(workspace_id=workspace, user_id=user, workspace_role='2').exists():
+            return Response({"detail": "You do not have permission to add members to this group."}, status=status.HTTP_403_FORBIDDEN)
+
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)

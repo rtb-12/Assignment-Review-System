@@ -3,6 +3,7 @@ from django.contrib import admin
 from django.urls import path, include
 
 from api.views import (
+    AddGroupMemberView,
     UserRegistrationView,
     UserLoginView,
     ProfileUpdateView,
@@ -13,6 +14,7 @@ from api.views import (
     WorkspaceListView,
     TokenRefreshView,
     WorkspaceAccessView,
+    GroupCreateView
 )
 
 oauth_handler = OAuth2Handler()
@@ -35,5 +37,8 @@ urlpatterns = [
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token-refresh'),
     path('oauth/authorize/', oauth_handler.authorize_user, name='authorize_user'),
     path('callback/', oauth_handler.oauth_callback, name='oauth_callback'),
-
+    path('api/workspace/<int:workspace_id>/create-group/',
+         GroupCreateView.as_view(), name='create-group'),
+    path('api/group/<int:group_id>/add-member/',
+         AddGroupMemberView.as_view(), name='add-group-member'),
 ]
