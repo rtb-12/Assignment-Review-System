@@ -1,24 +1,21 @@
 # api/views.py
 import uuid
 import requests
-import json
 import urllib.parse
-from django.shortcuts import redirect
-from django.conf import settings
-from django.http import JsonResponse
-from django.utils import timezone
-from datetime import timedelta
-from rest_framework import generics, status
-from rest_framework.permissions import IsAuthenticated, AllowAny
-from rest_framework.response import Response
-from rest_framework_simplejwt.authentication import JWTAuthentication
-from rest_framework_simplejwt.tokens import RefreshToken
-from django.middleware.csrf import CsrfViewMiddleware, get_token
-from .models import (GroupDetails, WorkspaceDetail,
+from django.shortcuts import redirect  # type: ignore
+from django.conf import settings  # type: ignore
+from django.http import JsonResponse  # type: ignore
+from rest_framework import generics, status  # type: ignore
+from rest_framework.permissions import IsAuthenticated, AllowAny  # type: ignore
+from rest_framework.response import Response  # type: ignore
+from rest_framework_simplejwt.authentication import JWTAuthentication  # type: ignore
+from rest_framework_simplejwt.tokens import RefreshToken  # type: ignore
+from django.middleware.csrf import CsrfViewMiddleware, get_token  # type: ignore
+from .models import (AssignmentDetails, AssignmentRoles, GroupDetails, WorkspaceDetail,
                      UserDetails,
                      WorkspaceMembers,
                      GroupMembers)
-from .serializers import (AddGroupMemberSerializer, WorkspaceCreateSerializer,
+from .serializers import (AddGroupMemberSerializer, AssignmentCreateSerializer, AssignmentRoleSerializer, WorkspaceCreateSerializer,
                           UserRegistrationSerializer,
                           UserLoginSerializer,
                           ProfileUpdateSerializer,
@@ -40,7 +37,7 @@ class OAuth2Handler:
     def authorize_user(self, request):
         state = str(uuid.uuid4())
         request.session['oauth_state'] = state
-        request.session.save()  # Explicitly save the session
+        request.session.save()
         authorization_url = f"{self.authorization_url}?client_id={self.client_id}&redirect_uri={self.redirect_uri}&state={state}"
         return redirect(authorization_url)
 
@@ -71,20 +68,17 @@ class OAuth2Handler:
         if 'access_token' in token_data:
             access_token = token_data['access_token']
 
-            # Fetch user data from the OAuth2 provider
             user_info_response = requests.get(self.user_info_url, headers={
                 'Authorization': f'Bearer {access_token}'
             })
             user_info = user_info_response.json()
             print("user_info: ", user_info)
 
-            # Extract user information
             email = user_info['contactInformation']['emailAddress']
             name = user_info['person']['fullName']
             profile_image = "https://channeli.in" + \
                 user_info['person'].get('displayPicture', '')
 
-            # Check if the user already exists and update or create the user
             user, created = UserDetails.objects.update_or_create(
                 email=email,
                 defaults={
@@ -93,14 +87,12 @@ class OAuth2Handler:
                 }
             )
 
-            # Authenticate the user (create a session or JWT token)
             refresh = RefreshToken.for_user(user)
             tokens = {
                 'refresh': str(refresh),
                 'access': str(refresh.access_token),
             }
 
-            # Return the tokens and user info
             return JsonResponse({
                 'user_id': user.user_id,
                 'name': user.name,
@@ -216,7 +208,7 @@ class JoinWorkspaceView(generics.GenericAPIView):
         user = request.user
 
         WorkspaceMembers.objects.create(
-            workspace_id=workspace, user_id=user, workspace_role='1')  # Pass the user instance instead of user.user_id
+            workspace_id=workspace, user_id=user, workspace_role='1')
         return Response({"detail": "You have successfully joined the workspace."}, status=status.HTTP_200_OK)
 
 
@@ -263,8 +255,6 @@ class WorkspaceAccessView(generics.GenericAPIView):
             return Response({"detail": "Member view", "workspace": workspace_details, "user": user_details}, status=status.HTTP_200_OK)
 
 
-# backend/api/views.py
-
 class GroupCreateView(generics.CreateAPIView):
     serializer_class = GroupCreateSerializer
     permission_classes = [IsAuthenticated]
@@ -290,8 +280,6 @@ class GroupCreateView(generics.CreateAPIView):
         return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
 
 
-# backend/api/views.py
-
 class AddGroupMemberView(generics.CreateAPIView):
     serializer_class = AddGroupMemberSerializer
     permission_classes = [IsAuthenticated]
@@ -306,7 +294,6 @@ class AddGroupMemberView(generics.CreateAPIView):
 
         workspace = group.workspace_id
 
-        # Check if the requester is an admin of the workspace
         if not WorkspaceMembers.objects.filter(workspace_id=workspace, user_id=user, workspace_role='2').exists():
             return Response({"detail": "You do not have permission to add members to this group."}, status=status.HTTP_403_FORBIDDEN)
 
@@ -316,3 +303,45 @@ class AddGroupMemberView(generics.CreateAPIView):
 
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
+
+class CreateAssignmentView(generics.CreateAPIView):
+    serializer_class = AssignmentCreateSerializer
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context['workspace_id'] = self.kwargs['workspace_id']
+        return context
+
+    def create(self, request, workspace_id):
+        user = request.user
+        try:
+            workspace = WorkspaceDetail.objects.get(workspace_id=workspace_id)
+        except WorkspaceDetail.DoesNotExist:
+            return Response({"detail": "Workspace not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if not WorkspaceMembers.objects.filter(workspace_id=workspace, user_id=user).exists():
+            return Response({"detail": "You are not a member of this workspace."}, status=status.HTTP_403_FORBIDDEN)
+
+        return super().create(request)
+
+
+class ManageAssignmentRolesView(generics.CreateAPIView):
+    serializer_class = AssignmentRoleSerializer
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+
+    def create(self, request, assignment_id):
+        user = request.user
+        try:
+            assignment = AssignmentDetails.objects.get(
+                assignment_id=assignment_id)
+        except AssignmentDetails.DoesNotExist:
+            return Response({"detail": "Assignment not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if not AssignmentRoles.objects.filter(assignment=assignment, user=user, role_id='2').exists():
+            return Response({"detail": "You do not have permission to manage roles for this assignment."}, status=status.HTTP_403_FORBIDDEN)
+
+        return super().create(request)
