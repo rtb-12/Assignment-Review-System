@@ -1,0 +1,26 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --radius: 0.5rem;
+    --primary-color: #4f46e5;
+    --secondary-color: #d1d5db;
+    --bg-color-light: #f9fafb;
+    --text-color-light: #1f2937;
+  }
+  .dark {
+    --bg-color-dark: #1f2937;
+    --text-color-dark: #e5e7eb; /* Updated to a lighter color for better contrast */
+  }
+  /* Applying the variables to body */
+  body {
+    background-color: var(--bg-color-light);
+    color: var(--text-color-light);
+  }
+  .dark body {
+    background-color: var(--bg-color-dark);
+    color: var(--text-color-dark);
+  }
+}
