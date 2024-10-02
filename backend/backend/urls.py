@@ -1,9 +1,10 @@
-# backend/urls.py
-from django.contrib import admin
-from django.urls import path, include
+from django.contrib import admin  # type: ignore
+from django.urls import path, include  # type: ignore
 
 from api.views import (
     AddGroupMemberView,
+    CreateAssignmentView,
+    ManageAssignmentRolesView,
     UserRegistrationView,
     UserLoginView,
     ProfileUpdateView,
@@ -41,4 +42,8 @@ urlpatterns = [
          GroupCreateView.as_view(), name='create-group'),
     path('api/group/<int:group_id>/add-member/',
          AddGroupMemberView.as_view(), name='add-group-member'),
+    path('api/workspace/<int:workspace_id>/create-assignment/',
+         CreateAssignmentView.as_view(), name='create-assignment'),
+    path('api/assignment/<int:assignment_id>/manage-roles/',
+         ManageAssignmentRolesView.as_view(), name='manage-assignment-roles'),
 ]

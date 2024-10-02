@@ -1,8 +1,9 @@
-from rest_framework_simplejwt.tokens import RefreshToken
-from django.contrib.auth.hashers import make_password, check_password
-from rest_framework import serializers
-from .models import (UserDetails, WorkspaceDetail,
-                     WorkspaceMembers, GroupDetails, GroupMembers)
+from rest_framework_simplejwt.tokens import RefreshToken  # type: ignore
+from django.contrib.auth.hashers import make_password, check_password  # type: ignore
+from rest_framework import serializers  # type: ignore
+from .models import (AssignmentRoles, UserDetails, WorkspaceDetail,
+                     WorkspaceMembers, GroupDetails, GroupMembers,
+                     AssignmentDetails)
 
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
@@ -137,3 +138,27 @@ class AddGroupMemberSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         group_member = GroupMembers.objects.create(**validated_data)
         return group_member
+
+
+class AssignmentCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AssignmentDetails
+        fields = ['assignment_description', 'deadline', 'subtask_details']
+
+    def create(self, validated_data):
+        user = self.context['request'].user
+        assignor = UserDetails.objects.get(user_id=user.user_id)
+        assignment = AssignmentDetails.objects.create(
+            assignor=assignor, **validated_data)
+
+        # Automatically add the creator to AssignmentRoles with role_id '2'
+        AssignmentRoles.objects.create(
+            assignment=assignment, user=assignor, role_id='2')
+
+        return assignment
+
+
+class AssignmentRoleSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AssignmentRoles
+        fields = ['assignment_id', 'user_id', 'role_id']

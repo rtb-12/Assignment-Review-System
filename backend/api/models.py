@@ -1,9 +1,9 @@
 # models.py
 import uuid
-from django.db import models
-from django.utils import timezone
+from django.db import models  # type: ignore
+from django.utils import timezone  # type: ignore
 from datetime import timedelta
-from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
+from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin  # type: ignore
 
 
 class UserDetailsManager(BaseUserManager):
@@ -27,7 +27,6 @@ class UserDetails(AbstractBaseUser, PermissionsMixin):
     user_id = models.AutoField(primary_key=True)
     name = models.CharField(max_length=255)
     email = models.EmailField(unique=True)
-    # Rename password_hash to password
     password = models.CharField(max_length=255)
     profile_image = models.ImageField(
         upload_to='profile_images/', null=True, blank=True)
@@ -131,3 +130,66 @@ class GroupMembers(models.Model):
 
     def __str__(self):
         return f"{self.userID} - {self.groupID}"
+
+
+class AssignmentDetails(models.Model):
+    assignment_id = models.AutoField(primary_key=True)
+    assignor = models.ForeignKey(
+        UserDetails, on_delete=models.CASCADE, db_column='Assignor_ID')
+    assignment_description = models.TextField()
+    deadline = models.DateTimeField()
+    subtask_details = models.TextField()
+
+    class Meta:
+        db_table = 'AssignmentDetails'
+        indexes = [
+            models.Index(fields=['assignment_id', 'assignor', 'assignment_description',
+                         'deadline', 'subtask_details'], name='assignment_details_idx'),
+        ]
+
+    def __str__(self):
+        return f"Assignment {self.assignment_id} by {self.assignor}"
+
+
+class AssignmentRoles(models.Model):
+    assignment = models.ForeignKey(
+        AssignmentDetails, on_delete=models.CASCADE, db_column='AssignmentID')
+    user = models.ForeignKey(
+        UserDetails, on_delete=models.CASCADE, db_column='userId')
+    role_id = models.CharField(max_length=255)
+
+    class Meta:
+        db_table = 'AssignmentRoles'
+        indexes = [
+            models.Index(fields=['assignment', 'user',
+                         'role_id'], name='assignment_roles_idx'),
+        ]
+
+    def __str__(self):
+        return f"Role {self.role_id} for Assignment {self.assignment}"
+
+
+class AssignmentStatus(models.Model):
+    user = models.ForeignKey(
+        UserDetails, on_delete=models.CASCADE, db_column='UserID')
+    task_id = models.CharField(max_length=255)
+    status = models.CharField(max_length=255)
+    reviewer = models.ForeignKey(
+        AssignmentRoles, on_delete=models.CASCADE, db_column='ReviewerID')
+    submission_id = models.CharField(max_length=255)
+    submission_link = models.URLField()
+    submission_doc = models.TextField()
+    points_assign = models.IntegerField()
+    assignment = models.ForeignKey(
+        AssignmentDetails, on_delete=models.CASCADE, db_column='AssignmentID')
+    feedback_details = models.TextField()
+
+    class Meta:
+        db_table = 'AssignmentStatus'
+        indexes = [
+            models.Index(fields=['user', 'task_id', 'status', 'reviewer', 'submission_id', 'submission_link',
+                         'submission_doc', 'assignment', 'feedback_details'], name='assignment_status_idx'),
+        ]
+
+    def __str__(self):
+        return f"Status {self.status} for Task {self.task_id} by User {self.user}"
