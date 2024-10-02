@@ -9,12 +9,11 @@ https://docs.djangoproject.com/en/4.2/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/4.2/ref/settings/
 """
-import environ
 from pathlib import Path
 from datetime import timedelta
-from dotenv import load_dotenv
+from dotenv import load_dotenv  # type: ignore
 import os
-from django.core.management.utils import get_random_secret_key
+from django.core.management.utils import get_random_secret_key  # type: ignore
 
 load_dotenv()
 
@@ -43,6 +42,10 @@ SECRET_KEY = "django-insecure-n400n4o*-d(2(3e5&54dc-kj)oov!sq$q+e$3i7t*913=0)8%p
 DEBUG = True
 
 ALLOWED_HOSTS = ["*"]
+
+
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (

@@ -11,11 +11,11 @@ from rest_framework.response import Response  # type: ignore
 from rest_framework_simplejwt.authentication import JWTAuthentication  # type: ignore
 from rest_framework_simplejwt.tokens import RefreshToken  # type: ignore
 from django.middleware.csrf import CsrfViewMiddleware, get_token  # type: ignore
-from .models import (AssignmentDetails, AssignmentRoles, GroupDetails, WorkspaceDetail,
+from .models import (AssignmentDetails, AssignmentRoles, AssignmentStatus, GroupDetails, WorkspaceDetail,
                      UserDetails,
                      WorkspaceMembers,
                      GroupMembers)
-from .serializers import (AddGroupMemberSerializer, AssignmentCreateSerializer, AssignmentRoleSerializer, WorkspaceCreateSerializer,
+from .serializers import (AddGroupMemberSerializer, AssignmentCreateSerializer, AssignmentRoleSerializer, AssignmentSubmissionSerializer, WorkspaceCreateSerializer,
                           UserRegistrationSerializer,
                           UserLoginSerializer,
                           ProfileUpdateSerializer,
@@ -345,3 +345,22 @@ class ManageAssignmentRolesView(generics.CreateAPIView):
             return Response({"detail": "You do not have permission to manage roles for this assignment."}, status=status.HTTP_403_FORBIDDEN)
 
         return super().create(request)
+
+
+class AssignmentSubmissionView(generics.UpdateAPIView):
+    queryset = AssignmentStatus.objects.all()
+    serializer_class = AssignmentSubmissionSerializer
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+    lookup_field = 'submission_id'
+
+    def update(self, request, *args, **kwargs):
+        user = request.user
+        submission_id = kwargs.get('submission_id')
+        try:
+            assignment_status = AssignmentStatus.objects.get(
+                submission_id=submission_id, user=user)
+        except AssignmentStatus.DoesNotExist:
+            return Response({"detail": "Submission not found or you do not have permission to update this submission."}, status=status.HTTP_404_NOT_FOUND)
+
+        return super().update(request, *args, **kwargs)

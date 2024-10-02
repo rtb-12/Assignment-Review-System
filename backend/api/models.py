@@ -138,7 +138,8 @@ class AssignmentDetails(models.Model):
         UserDetails, on_delete=models.CASCADE, db_column='Assignor_ID')
     assignment_description = models.TextField()
     deadline = models.DateTimeField()
-    subtask_details = models.TextField()
+    subtask_details = models.JSONField(default=list)
+    attachments = models.JSONField(default=list)
 
     class Meta:
         db_table = 'AssignmentDetails'
@@ -182,7 +183,10 @@ class AssignmentStatus(models.Model):
     points_assign = models.IntegerField()
     assignment = models.ForeignKey(
         AssignmentDetails, on_delete=models.CASCADE, db_column='AssignmentID')
-    feedback_details = models.TextField()
+    feedback_details = models.JSONField(
+        default=list)
+    submission_attachments = models.JSONField(
+        default=list)
 
     class Meta:
         db_table = 'AssignmentStatus'
