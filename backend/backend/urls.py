@@ -1,8 +1,11 @@
 from django.contrib import admin  # type: ignore
 from django.urls import path, include  # type: ignore
+from django.conf import settings  # type: ignore
+from django.conf.urls.static import static  # type: ignore
 
 from api.views import (
     AddGroupMemberView,
+    AssignmentSubmissionView,
     CreateAssignmentView,
     ManageAssignmentRolesView,
     UserRegistrationView,
@@ -46,4 +49,6 @@ urlpatterns = [
          CreateAssignmentView.as_view(), name='create-assignment'),
     path('api/assignment/<int:assignment_id>/manage-roles/',
          ManageAssignmentRolesView.as_view(), name='manage-assignment-roles'),
-]
+    path('submissions/<str:submission_id>/',
+         AssignmentSubmissionView.as_view(), name='assignment-submission'),
+] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

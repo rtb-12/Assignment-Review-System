@@ -1,7 +1,11 @@
+import os
+from django.conf import settings  # type: ignore
+from django.core.files.storage import default_storage  # type: ignore
+from django.core.files.base import ContentFile  # type: ignore
 from rest_framework_simplejwt.tokens import RefreshToken  # type: ignore
 from django.contrib.auth.hashers import make_password, check_password  # type: ignore
 from rest_framework import serializers  # type: ignore
-from .models import (AssignmentRoles, UserDetails, WorkspaceDetail,
+from .models import (AssignmentRoles, AssignmentStatus, UserDetails, WorkspaceDetail,
                      WorkspaceMembers, GroupDetails, GroupMembers,
                      AssignmentDetails)
 
@@ -141,24 +145,69 @@ class AddGroupMemberSerializer(serializers.ModelSerializer):
 
 
 class AssignmentCreateSerializer(serializers.ModelSerializer):
+    attachments = serializers.ListField(
+        child=serializers.FileField(), required=False)
+    subtask_details = serializers.JSONField()
+
     class Meta:
         model = AssignmentDetails
-        fields = ['assignment_description', 'deadline', 'subtask_details']
+        fields = ['assignment_description', 'deadline',
+                  'subtask_details', 'attachments']
 
     def create(self, validated_data):
         user = self.context['request'].user
         assignor = UserDetails.objects.get(user_id=user.user_id)
+        attachments = validated_data.pop('attachments', [])
         assignment = AssignmentDetails.objects.create(
             assignor=assignor, **validated_data)
 
-        # Automatically add the creator to AssignmentRoles with role_id '2'
+        for attachment in attachments:
+            file_path = self.save_attachment(attachment)
+            assignment.attachments.append(file_path)
+
+        assignment.save()
+
         AssignmentRoles.objects.create(
             assignment=assignment, user=assignor, role_id='2')
 
         return assignment
+
+    def save_attachment(self, attachment):
+        path = os.path.join(settings.MEDIA_ROOT, attachment.name)
+        default_storage.save(path, ContentFile(attachment.read()))
+        return path
 
 
 class AssignmentRoleSerializer(serializers.ModelSerializer):
     class Meta:
         model = AssignmentRoles
         fields = ['assignment_id', 'user_id', 'role_id']
+
+
+class AssignmentSubmissionSerializer(serializers.ModelSerializer):
+    submission_attachments = serializers.ListField(
+        child=serializers.FileField(), required=False)
+    comments = serializers.CharField(required=False, allow_blank=True)
+
+    class Meta:
+        model = AssignmentStatus
+        fields = ['task_id', 'status', 'submission_link',
+                  'submission_doc', 'comments', 'submission_attachments']
+
+    def update(self, instance, validated_data):
+        submission_attachments = validated_data.pop(
+            'submission_attachments', [])
+        instance = super().update(instance, validated_data)
+
+        # Save submission attachments
+        for attachment in submission_attachments:
+            file_path = self.save_attachment(attachment)
+            instance.submission_attachments.append(file_path)
+
+        instance.save()
+        return instance
+
+    def save_attachment(self, attachment):
+        path = os.path.join(settings.MEDIA_ROOT, attachment.name)
+        default_storage.save(path, ContentFile(attachment.read()))
+        return path
