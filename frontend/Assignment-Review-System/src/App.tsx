@@ -11,6 +11,8 @@ import AssignmentCreationPage from "./components/AssignmentCreationPage/Assignme
 import AssignmentSubmissionPage from "./components/AssignmentUserViewPage/AssignmetUserView";
 import "./App.css";
 import AssignmentdashboardPage from "./components/AssignmentDashboard/AssignmentDashboard";
+import AssignmentReviewerCard from "./components/AssignmentReviewerPage/AssignmentReviewerCard";
+import AssignmentReviewPage from "./components/AssignmentReviewerPage/AssignmentReviewPage";
 
 function App() {
   return (
@@ -28,9 +30,14 @@ function App() {
           element={<AssignmentSubmissionPage />}
         />
         <Route
-          path="  "
+          path="/assignment-dashboard"
           element={<AssignmentdashboardPage />}
         />
+        <Route
+          path="/assignment-reviewer"
+          element={<AssignmentReviewerCard />}
+        />
+        <Route path="/assignment-review" element={<AssignmentReviewPage />} />
       </Routes>
     </Router>
   );
