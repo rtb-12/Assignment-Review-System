@@ -22,32 +22,35 @@ const Workspace = () => {
   const [workspaceName, setWorkspaceName] = useState("");
   const [workspaceDescription, setWorkspaceDescription] = useState("");
   const [workspaceLogo, setWorkspaceLogo] = useState<File | null>(null);
+  const [workspaces, setWorkspaces] = useState([]);
 
-  // Example data for available workspaces
-  const workspaces = [
-    {
-      name: "Development Team",
-      description: "Workspace for the development team.",
-      members: 10,
-    },
-    {
-      name: "Marketing Team",
-      description: "Workspace for the marketing team.",
-      members: 8,
-    },
-    {
-      name: "Design Team",
-      description: "Workspace for the design team.",
-      members: 5,
-    },
-  ];
-
-  // Wait for the typewriter effect to complete, then show the cards
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setShowCards(true);
-    }, 2000); // Adjust the timeout based on typewriter speed
-    return () => clearTimeout(timer);
+    // Fetch user workspaces
+    const fetchWorkspaces = async () => {
+      try {
+        const response = await fetch(
+          "http://localhost:8000/api/user/workspaces/",
+          {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+            },
+          }
+        );
+        if (response.ok) {
+          const data = await response.json();
+          setWorkspaces(data);
+          setShowCards(true);
+        } else {
+          console.error("Failed to fetch workspaces");
+        }
+      } catch (error) {
+        console.error("Error fetching workspaces:", error);
+      }
+    };
+
+    fetchWorkspaces();
   }, []);
 
   // Animating cards row by row (populating from the center)
@@ -59,19 +62,41 @@ const Workspace = () => {
         }, index * 300); // Delay between each card
       });
     }
-  }, [showCards]);
+  }, [showCards, workspaces]);
 
   const openModal = () => setIsModalOpen(true);
   const closeModal = () => setIsModalOpen(false);
 
-  const handleCreateWorkspace = () => {
-    // Handle the creation of the workspace
-    console.log("Workspace Created:", {
-      name: workspaceName,
-      description: workspaceDescription,
-      logo: workspaceLogo,
-    });
-    closeModal();
+  const handleCreateWorkspace = async () => {
+    const formData = new FormData();
+    formData.append("workspace_name", workspaceName);
+    formData.append("workspace_description", workspaceDescription);
+    if (workspaceLogo) {
+      formData.append("workspace_logo_image", workspaceLogo);
+    }
+
+    try {
+      const response = await fetch(
+        "http://localhost:8000/api/workspace/create/",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+          },
+          body: formData,
+        }
+      );
+
+      if (response.ok) {
+        const newWorkspace = await response.json();
+        setWorkspaces((prev) => [...prev, newWorkspace]);
+        closeModal();
+      } else {
+        console.error("Failed to create workspace");
+      }
+    } catch (error) {
+      console.error("Error creating workspace:", error);
+    }
   };
 
   return (
@@ -91,25 +116,31 @@ const Workspace = () => {
       {/* Adjusting gap between text and cards for mobile responsiveness */}
       <div className="flex flex-wrap justify-center gap-4 mt-20 md:mt-12 w-full px-4">
         {showCards &&
-          workspaces.map((workspace, index) => (
-            <div
-              key={index}
-              className={`transition-opacity duration-500 ease-out transform ${
-                cardsVisible.includes(index)
-                  ? "opacity-100 scale-100"
-                  : "opacity-0 scale-50"
-              }`}
-              style={{
-                transitionDelay: `${index * 300}ms`,
-              }}
-            >
-              <WorkspaceCard
-                name={workspace.name}
-                description={workspace.description}
-                members={workspace.members}
-              />
-            </div>
-          ))}
+          workspaces.map(
+            (workspace, index) => (
+              console.log(workspace),
+              (
+                <div
+                  key={index}
+                  className={`transition-opacity duration-500 ease-out transform ${
+                    cardsVisible.includes(index)
+                      ? "opacity-100 scale-100"
+                      : "opacity-0 scale-50"
+                  }`}
+                  style={{
+                    transitionDelay: `${index * 300}ms`,
+                  }}
+                >
+                  <WorkspaceCard
+                    name={workspace.workspace_name}
+                    description={workspace.workspace_description}
+                    members={workspace.members}
+                    logo={workspace.workspace_logo_image}
+                  />
+                </div>
+              )
+            )
+          )}
       </div>
 
       {/* Floating Action Button for creating a workspace */}

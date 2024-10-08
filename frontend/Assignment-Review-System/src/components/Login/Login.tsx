@@ -5,8 +5,11 @@ import { Input } from "../ui/input";
 import { cn } from "../../lib/utils";
 import { Button } from "../ui/button";
 import { IconBrandGoogle } from "@tabler/icons-react";
+import { useNavigate } from "react-router-dom";
+import axios from "axios";
 
 const Login = () => {
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -17,7 +20,7 @@ const Login = () => {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    setError(null); // Clear any previous errors
+    setError(null);
 
     const dataToSend = {
       email: formData.email,
@@ -25,17 +28,27 @@ const Login = () => {
     };
 
     try {
-      const response = await fetch("http://localhost:3000/api/user/login/", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(dataToSend),
-      });
+      const response = await axios.post(
+        "http://localhost:8000/api/user/login/",
+        dataToSend,
+        {
+          headers: {
+            "Content-Type": "application/json",
+          },
+          withCredentials: true,
+        }
+      );
 
-      if (response.ok) {
+      if (response.status === 200) {
+        const { access, refresh, csrf_token } = response.data;
+
+        // Store tokens in localStorage
+        localStorage.setItem("access_token", access);
+        localStorage.setItem("refresh_token", refresh);
+        localStorage.setItem("csrf_token", csrf_token);
+
         console.log("Login successful");
-        // Handle success (e.g., navigate to another page or show success message)
+        navigate("/workspace");
       } else {
         console.error("Error during login");
         setError("Invalid email or password.");
@@ -54,7 +67,7 @@ const Login = () => {
   };
 
   const handleChannelILogin = () => {
-    window.location.href = "http://localhost:3000/oauth/authorize/";
+    window.location.href = "http://localhost:8000/oauth/authorize/";
   };
 
   return (

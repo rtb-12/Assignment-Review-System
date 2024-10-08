@@ -4,8 +4,10 @@ import { Label } from "../ui/label";
 import { Input } from "../ui/input";
 import { cn } from "../../lib/utils";
 import { IconBrandGoogle } from "@tabler/icons-react";
+import { useNavigate } from "react-router-dom";
 
 export default function SignupFormDemo() {
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -24,29 +26,30 @@ export default function SignupFormDemo() {
       return;
     }
 
-    setError(null); // Clear any previous errors
+    setError(null);
 
     const dataToSend = {
       name: formData.name,
       email: formData.email,
       password: formData.password,
+      retype: formData.confirmPassword,
     };
 
     try {
-      const response = await fetch("http://localhost:3000/api/user/register/", {
+      const response = await fetch("http://localhost:8000/api/user/register/", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify(dataToSend),
       });
-
+      // console.log("response", response);
       if (response.ok) {
         console.log("Sign up successful");
-        // Handle success (e.g., navigate to another page or show success message)
+        alert("Sign up successful redirecting to login page");
+        navigate("/login");
       } else {
         console.error("Error during sign up");
-        // Handle error response from the server
       }
     } catch (error) {
       console.error("Error submitting the form:", error);
@@ -61,7 +64,7 @@ export default function SignupFormDemo() {
   };
 
   const handleChannelILogin = () => {
-    window.location.href = "http://localhost:3000/oauth/authorize/";
+    window.location.href = "http://localhost:8000/oauth/authorize/";
   };
 
   return (
