@@ -88,7 +88,7 @@ class WorkspaceCreateSerializer(serializers.ModelSerializer):
         workspace = WorkspaceDetail.objects.create(**validated_data)
         WorkspaceMembers.objects.create(
             workspace_id=workspace,
-            user_id=user,  # Pass the user instance instead of user.user_id
+            user_id=user,
             workspace_role='2'  # Role 2 indicates admin
         )
         return workspace

@@ -6,27 +6,32 @@ interface WorkspaceCardProps {
   name: string;
   description: string;
   members: number;
+  logo: string;
 }
 
 const WorkspaceCard: React.FC<WorkspaceCardProps> = ({
   name,
   description,
   members,
+  logo,
 }) => {
   return (
     <div className="w-full group/card">
       <div
         className={cn(
           "cursor-pointer overflow-hidden relative card rounded-md shadow-xl flex flex-col justify-between p-4 transition-transform duration-300 transform group-hover/card:scale-105",
-          "bg-[url(https://images.unsplash.com/photo-1544077960-604201fe74bc?ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&ixlib=rb-1.2.1&auto=format&fit=crop&w=1651&q=80)] bg-cover"
+          "bg-cover"
         )}
         style={{
-          height: "20rem", // Default height for mobile
-          width: "15rem", // Default width for mobile
+          backgroundImage: `url(${logo})`,
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          height: "20rem",
+          width: "15rem",
         }}
       >
-        {/* Overlay for hover effect */}
-        <div className="absolute w-full h-full top-0 left-0 transition duration-300 group-hover/card:bg-black opacity-60"></div>
+        {/* Dark tint overlay */}
+        <div className="absolute w-full h-full top-0 left-0 bg-black opacity-20 group-hover/card:opacity-50 transition-opacity duration-300"></div>
 
         {/* Card Content */}
         <div className="flex flex-col z-10">

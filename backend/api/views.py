@@ -1,4 +1,7 @@
 # api/views.py
+from django.middleware.csrf import get_token
+from rest_framework import status
+from rest_framework.response import Response
 import uuid
 import requests
 import urllib.parse
@@ -47,11 +50,10 @@ class OAuth2Handler:
         stored_state = request.session.get('oauth_state')
 
         # if state != stored_state:
-        #     print(state, " ", stored_state)
         #     return JsonResponse({'error': 'State mismatch'}, status=400)
 
-        # # Remove the state from the session after the check
-        # request.session.pop('oauth_state', None)
+        # Remove the state from the session after the check
+        request.session.pop('oauth_state', None)
 
         # Exchange the authorization code for an access token
         data = {
@@ -72,7 +74,6 @@ class OAuth2Handler:
                 'Authorization': f'Bearer {access_token}'
             })
             user_info = user_info_response.json()
-            print("user_info: ", user_info)
 
             email = user_info['contactInformation']['emailAddress']
             name = user_info['person']['fullName']
@@ -93,13 +94,27 @@ class OAuth2Handler:
                 'access': str(refresh.access_token),
             }
 
-            return JsonResponse({
+            response = JsonResponse({
                 'user_id': user.user_id,
                 'name': user.name,
                 'email': user.email,
-                'profile_image': urllib.parse.unquote(user.profile_image.url) if user.profile_image else None, 'refresh': tokens['refresh'],
+                'profile_image': urllib.parse.unquote(user.profile_image.url) if user.profile_image else None,
+                'refresh': tokens['refresh'],
                 'access': tokens['access'],
             })
+
+            # Set cookies
+            response.set_cookie('csrftoken', get_token(
+                request), secure=False, httponly=False, samesite='None')
+            response.set_cookie(
+                'access', tokens['access'], secure=False, httponly=False, samesite='None')
+            response.set_cookie(
+                'refresh', tokens['refresh'], secure=False, httponly=False, samesite='None')
+
+            # Redirect to frontend
+            frontend_url = "http://localhost:5173/workspace"
+            return redirect(frontend_url)
+
         else:
             return JsonResponse({'error': 'Failed to obtain access token'}, status=400)
 
@@ -120,6 +135,7 @@ class UserLoginView(generics.GenericAPIView):
         user = serializer.validated_data
         tokens = serializer.create(user)
         csrf_token = get_token(request)
+
         response = Response({
             "user_id": user.user_id,
             "name": user.name,
@@ -128,13 +144,31 @@ class UserLoginView(generics.GenericAPIView):
             "access": tokens['access'],
             "csrf_token": csrf_token,
         }, status=status.HTTP_200_OK)
+
         response.set_cookie('csrftoken', csrf_token,
-                            secure=True, httponly=True)
-        response.set_cookie(
-            'access', tokens['access'], secure=True, httponly=True)
-        response.set_cookie(
-            'refresh', tokens['refresh'], secure=True, httponly=True)
+                            secure=True, httponly=False, samesite='None')
+        response.set_cookie('access', tokens['access'],
+                            secure=True, httponly=False, samesite='None')
+        response.set_cookie('refresh', tokens['refresh'],
+                            secure=True, httponly=False, samesite='None')
+
+        response['Access-Control-Allow-Origin'] = 'http://localhost:5173'
+        response['Access-Control-Allow-Credentials'] = 'true'
+
         return response
+
+
+class UserDetailsView(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+
+    def get(self, request):
+        user = request.user
+        user_details = {
+            "username": user.name,
+            "profile_pic": user.profile_image.url if user.profile_image else None,
+        }
+        return Response(user_details, status=status.HTTP_200_OK)
 
 
 class ProfileUpdateView(generics.UpdateAPIView):
@@ -217,6 +251,23 @@ class WorkspaceListView(generics.ListAPIView):
     serializer_class = WorkspaceCreateSerializer
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
+
+
+class UserWorkspacesView(generics.ListAPIView):
+    serializer_class = WorkspaceCreateSerializer
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+
+    def get_queryset(self):
+        user = self.request.user
+        workspace_ids = WorkspaceMembers.objects.filter(
+            user_id=user).values_list('workspace_id', flat=True)
+        return WorkspaceDetail.objects.filter(workspace_id__in=workspace_ids)
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
 
 class TokenRefreshView(generics.GenericAPIView):

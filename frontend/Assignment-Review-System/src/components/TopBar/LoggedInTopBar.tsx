@@ -1,19 +1,14 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "../ui/button";
-import { Sun, Moon, BadgeCheck } from "lucide-react"; // Icons for light/dark mode toggle
-import Sidebar from "./SideBar"; // Import the Sidebar component
+import { Sun, Moon, BadgeCheck } from "lucide-react";
+import Sidebar from "./SideBar";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
 
 const LoggedInTopBar = () => {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [isDarkMode, setIsDarkMode] = useState(false);
-
-  // Default user info
-  const defaultUser = {
-    name: "John Doe",
-    image: "https://via.placeholder.com/40x40",
-  };
 
   useEffect(() => {
     const root = window.document.documentElement;
@@ -31,7 +26,6 @@ const LoggedInTopBar = () => {
   return (
     <div className="flex justify-between items-center p-4 bg-lightBg text-lightText dark:bg-darkBg dark:text-darkText w-full">
       {/* Sidebar */}
-
       <div className="flex flex-row items-center space-x-2 gap-1">
         <Sidebar />
         <div className=" flex gap-2">
@@ -55,12 +49,12 @@ const LoggedInTopBar = () => {
 
         <div className="flex items-center space-x-3 p-2 bg-gray-100 dark:bg-gray-700 rounded-lg cursor-pointer">
           <img
-            src={defaultUser.image}
-            alt={defaultUser.name}
+            src={user?.profilePic || "https://via.placeholder.com/40x40"}
+            alt={user?.username || "User"}
             className="w-10 h-10 rounded-full object-cover"
           />
           <span className="text-sm font-medium text-gray-800 dark:text-white">
-            {defaultUser.name}
+            {user?.username || "User"}
           </span>
         </div>
       </div>
