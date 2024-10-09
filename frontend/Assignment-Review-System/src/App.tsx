@@ -30,13 +30,14 @@ function App() {
         <AuthConsumer>
           {({ isAuthenticated }) => (
             <>
-              {isAuthenticated ? <LoggedInTopBar /> : <TopBar />}
+              {/* {isAuthenticated ? <LoggedInTopBar /> : <TopBar />} */}
+              <LoggedInTopBar />
               <Routes>
                 <Route path="/" element={<Home />} />
                 <Route path="/signup" element={<SignUp />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/workspace" element={<Workspace />} />
-                <Route path="/userpage" element={<UserPage />} />
+                <Route path="/workspace/:workspaceId" element={<UserPage />} />
                 <Route
                   path="/create-assignment"
                   element={<AssignmentCreationPage />}

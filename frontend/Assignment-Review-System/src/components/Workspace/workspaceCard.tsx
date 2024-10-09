@@ -1,22 +1,28 @@
-"use client";
 import React from "react";
+import { useNavigate } from "react-router-dom";
 import { cn } from "../../lib/utils";
 
 interface WorkspaceCardProps {
+  id: number;
   name: string;
   description: string;
-  members: number;
   logo: string;
 }
 
 const WorkspaceCard: React.FC<WorkspaceCardProps> = ({
+  id,
   name,
   description,
-  members,
   logo,
 }) => {
+  const navigate = useNavigate();
+
+  const handleCardClick = () => {
+    navigate(`/workspace/${id}`);
+  };
+
   return (
-    <div className="w-full group/card">
+    <div className="w-full group/card" onClick={handleCardClick}>
       <div
         className={cn(
           "cursor-pointer overflow-hidden relative card rounded-md shadow-xl flex flex-col justify-between p-4 transition-transform duration-300 transform group-hover/card:scale-105",
@@ -38,11 +44,8 @@ const WorkspaceCard: React.FC<WorkspaceCardProps> = ({
           <h1 className="font-bold text-lg md:text-xl lg:text-2xl text-gray-50 relative z-10">
             {name}
           </h1>
-          <p className="font-normal text-sm text-gray-50 relative z-10 my-2">
+          <p className="font-normal text-sm text-gray-50 relative z-10 my-2 top-[12.5rem]">
             {description}
-          </p>
-          <p className="font-normal text-xs md:text-sm text-gray-50 relative z-10">
-            Members: {members}
           </p>
         </div>
       </div>

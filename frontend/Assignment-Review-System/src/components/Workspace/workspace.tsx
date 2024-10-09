@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import Cookies from "js-cookie";
 import { TypewriterEffect } from "../ui/typewriter-effect";
 import WorkspaceCard from "./workspaceCard";
 import { IconPlus } from "@tabler/icons-react";
@@ -34,7 +35,7 @@ const Workspace = () => {
             method: "GET",
             headers: {
               "Content-Type": "application/json",
-              Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+              Authorization: `Bearer ${Cookies.get("access")}`,
             },
           }
         );
@@ -81,7 +82,7 @@ const Workspace = () => {
         {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+            Authorization: `Bearer ${Cookies.get("access")}`,
           },
           body: formData,
         }
@@ -134,8 +135,8 @@ const Workspace = () => {
                   <WorkspaceCard
                     name={workspace.workspace_name}
                     description={workspace.workspace_description}
-                    members={workspace.members}
                     logo={workspace.workspace_logo_image}
+                    id={workspace.workspace_id}
                   />
                 </div>
               )

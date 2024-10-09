@@ -7,6 +7,7 @@ import { Button } from "../ui/button";
 import { IconBrandGoogle } from "@tabler/icons-react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import Cookies from "js-cookie";
 
 const Login = () => {
   const navigate = useNavigate();
@@ -40,13 +41,6 @@ const Login = () => {
       );
 
       if (response.status === 200) {
-        const { access, refresh, csrf_token } = response.data;
-
-        // Store tokens in localStorage
-        localStorage.setItem("access_token", access);
-        localStorage.setItem("refresh_token", refresh);
-        localStorage.setItem("csrf_token", csrf_token);
-
         console.log("Login successful");
         navigate("/workspace");
       } else {

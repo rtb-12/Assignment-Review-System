@@ -1,5 +1,6 @@
 import React, { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import Cookies from "js-cookie";
 
 const OAuthCallback = () => {
   const navigate = useNavigate();
@@ -21,10 +22,10 @@ const OAuthCallback = () => {
         .then((response) => response.json())
         .then((data) => {
           if (data.access && data.refresh) {
-            // Store tokens in localStorage
-            localStorage.setItem("access_token", data.access);
-            localStorage.setItem("refresh_token", data.refresh);
-            localStorage.setItem("csrf_token", data.csrf_token);
+            // Store tokens in cookies
+            Cookies.set("access_token", data.access);
+            Cookies.set("refresh_token", data.refresh);
+            Cookies.set("csrf_token", data.csrf_token);
 
             // Redirect to workspace
             navigate("/workspace");
