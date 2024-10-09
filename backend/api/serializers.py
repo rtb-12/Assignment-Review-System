@@ -80,8 +80,8 @@ class InvitationLinkSerializer(serializers.ModelSerializer):
 class WorkspaceCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = WorkspaceDetail
-        fields = ['workspace_name', 'workspace_logo_image',
-                  'workspace_description']
+        fields = ['workspace_id', 'workspace_name',
+                  'workspace_logo_image', 'workspace_description']
 
     def create(self, validated_data):
         user = self.context['request'].user
@@ -211,3 +211,34 @@ class AssignmentSubmissionSerializer(serializers.ModelSerializer):
         path = os.path.join(settings.MEDIA_ROOT, attachment.name)
         default_storage.save(path, ContentFile(attachment.read()))
         return path
+
+
+class LeaderboardSerializer(serializers.ModelSerializer):
+    points = serializers.IntegerField()
+
+    class Meta:
+        model = UserDetails
+        fields = ['name', 'image', 'points']
+
+
+class BaseAssignmentSerializer(serializers.ModelSerializer):
+    assignment_id = serializers.IntegerField(source='assignment.assignment_id')
+    assignment_name = serializers.CharField(
+        source='assignment.assignment_description')
+    deadline = serializers.DateTimeField(source='assignment.deadline')
+
+    class Meta:
+        model = AssignmentStatus
+        fields = ['assignment_id', 'assignment_name', 'deadline']
+
+
+class AssignmentStatusDetailSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AssignmentStatus
+        fields = '__all__'
+
+
+class AssignmentDetailsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AssignmentDetails
+        fields = '__all__'

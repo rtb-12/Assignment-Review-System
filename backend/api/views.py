@@ -1,4 +1,5 @@
 # api/views.py
+from datetime import timezone
 from django.middleware.csrf import get_token
 from rest_framework import status
 from rest_framework.response import Response
@@ -14,11 +15,12 @@ from rest_framework.response import Response  # type: ignore
 from rest_framework_simplejwt.authentication import JWTAuthentication  # type: ignore
 from rest_framework_simplejwt.tokens import RefreshToken  # type: ignore
 from django.middleware.csrf import CsrfViewMiddleware, get_token  # type: ignore
+from django.db.models import Sum
 from .models import (AssignmentDetails, AssignmentRoles, AssignmentStatus, GroupDetails, WorkspaceDetail,
                      UserDetails,
                      WorkspaceMembers,
                      GroupMembers)
-from .serializers import (AddGroupMemberSerializer, AssignmentCreateSerializer, AssignmentRoleSerializer, AssignmentSubmissionSerializer, WorkspaceCreateSerializer,
+from .serializers import (AddGroupMemberSerializer, AssignmentCreateSerializer, AssignmentDetailsSerializer, AssignmentRoleSerializer, AssignmentStatusDetailSerializer, AssignmentSubmissionSerializer, BaseAssignmentSerializer, LeaderboardSerializer, WorkspaceCreateSerializer,
                           UserRegistrationSerializer,
                           UserLoginSerializer,
                           ProfileUpdateSerializer,
@@ -415,3 +417,141 @@ class AssignmentSubmissionView(generics.UpdateAPIView):
             return Response({"detail": "Submission not found or you do not have permission to update this submission."}, status=status.HTTP_404_NOT_FOUND)
 
         return super().update(request, *args, **kwargs)
+
+
+class LeaderboardView(generics.ListAPIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        leaderboard_data = AssignmentStatus.objects.select_related('user').values(
+            'user__name', 'user__profile_image').annotate(points=Sum('points_assign')).order_by('-points')
+
+        leaderboard = [
+            {
+                'name': data['user__name'],
+                'image': data['user__profile_image'],
+                'points': data['points']
+            }
+            for data in leaderboard_data
+        ]
+
+        serializer = LeaderboardSerializer(leaderboard, many=True)
+        return Response(serializer.data)
+
+
+class OngoingAssignmentsView(generics.ListAPIView):
+    serializer_class = BaseAssignmentSerializer
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+
+    def get_queryset(self):
+        user = self.request.user
+        now = timezone.now()
+
+        # Filter assignments where the deadline is not crossed
+        ongoing_assignments = AssignmentStatus.objects.filter(
+            user=user,
+            assignment__deadline__gt=now
+        ).select_related('assignment')
+
+        # Filter assignments where not all subtasks are completed
+        filtered_assignments = []
+        for assignment_status in ongoing_assignments:
+            subtask_statuses = AssignmentStatus.objects.filter(
+                assignment=assignment_status.assignment,
+                user=user
+            ).values_list('status', flat=True)
+
+            if 'completed' not in subtask_statuses:
+                filtered_assignments.append(assignment_status)
+
+        return filtered_assignments
+
+
+class CompletedAssignmentsView(generics.ListAPIView):
+    serializer_class = BaseAssignmentSerializer
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+
+    def get_queryset(self):
+        user = self.request.user
+
+        # Filter assignments where all subtasks are completed
+        completed_assignments = AssignmentStatus.objects.filter(
+            user=user
+        ).select_related('assignment')
+
+        filtered_assignments = []
+        for assignment_status in completed_assignments:
+            subtask_statuses = AssignmentStatus.objects.filter(
+                assignment=assignment_status.assignment,
+                user=user
+            ).values_list('status', flat=True)
+
+            if all(status == 'completed' for status in subtask_statuses):
+                filtered_assignments.append(assignment_status)
+
+        return filtered_assignments
+
+
+class CrossedDeadlineAssignmentsView(generics.ListAPIView):
+    serializer_class = BaseAssignmentSerializer
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+
+    def get_queryset(self):
+        user = self.request.user
+        now = timezone.now()
+
+        # Filter assignments where the deadline is crossed
+        crossed_deadline_assignments = AssignmentStatus.objects.filter(
+            user=user,
+            assignment__deadline__lte=now
+        ).select_related('assignment')
+
+        return crossed_deadline_assignments
+
+
+class AssignmentStatusDetailView(generics.RetrieveAPIView):
+    serializer_class = AssignmentStatusDetailSerializer
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+
+    def get(self, request, user_id, assignment_id):
+        try:
+            user = UserDetails.objects.get(user_id=user_id)
+        except UserDetails.DoesNotExist:
+            return Response({"detail": "User not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            assignment = AssignmentDetails.objects.get(
+                assignment_id=assignment_id)
+        except AssignmentDetails.DoesNotExist:
+            return Response({"detail": "Assignment not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            assignment_status = AssignmentStatus.objects.get(
+                user=user, assignment=assignment)
+        except AssignmentStatus.DoesNotExist:
+            return Response({"detail": "Assignment status not found for this user."}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = self.get_serializer(assignment_status)
+        return Response(serializer.data)
+
+
+class ViewAssignmentDetailsView(generics.RetrieveAPIView):
+    serializer_class = AssignmentDetailsSerializer
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+    lookup_field = 'assignment_id'
+    queryset = AssignmentDetails.objects.all()
+
+    def get(self, request, assignment_id):
+        try:
+            assignment = AssignmentDetails.objects.get(
+                assignment_id=assignment_id)
+        except AssignmentDetails.DoesNotExist:
+            return Response({"detail": "Assignment not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = self.get_serializer(assignment)
+        return Response(serializer.data)

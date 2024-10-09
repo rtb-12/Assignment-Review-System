@@ -6,6 +6,7 @@ import React, {
   useEffect,
 } from "react";
 import axios from "axios";
+import Cookies from "js-cookie";
 
 interface AuthContextProps {
   isAuthenticated: boolean;
@@ -27,11 +28,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   } | null>(null);
 
   useEffect(() => {
-    const accessToken = localStorage.getItem("access_token");
-    const csrfToken = localStorage.getItem("csrf_token");
-    const refreshToken = localStorage.getItem("refresh_token");
+    const accessToken = Cookies.get("access_token");
+    const csrfToken = Cookies.get("csrf_token");
+    const refreshToken = Cookies.get("refresh_token");
 
     if (accessToken && csrfToken && refreshToken) {
+      console.log("User is authenticated");
       setIsAuthenticated(true);
       fetchUserDetails(accessToken, csrfToken);
     }
@@ -61,17 +63,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   ) => {
     setIsAuthenticated(true);
     setUser(user);
-    localStorage.setItem("access_token", tokens.access);
-    localStorage.setItem("refresh_token", tokens.refresh);
-    localStorage.setItem("csrf_token", tokens.csrf);
+    Cookies.set("access_token", tokens.access, {
+      sameSite: "Strict",
+      secure: true,
+    });
+    Cookies.set("refresh_token", tokens.refresh, {
+      sameSite: "Strict",
+      secure: true,
+    });
+    Cookies.set("csrf_token", tokens.csrf, {
+      sameSite: "Strict",
+      secure: true,
+    });
   };
 
   const logout = () => {
     setIsAuthenticated(false);
     setUser(null);
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("refresh_token");
-    localStorage.removeItem("csrf_token");
+    Cookies.remove("access_token");
+    Cookies.remove("refresh_token");
+    Cookies.remove("csrf_token");
   };
 
   return (
