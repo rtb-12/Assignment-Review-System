@@ -5,16 +5,24 @@ import React, { useEffect } from "react";
 import { cn } from "../../lib/utils";
 import { GoCopilot } from "react-icons/go";
 
-export function AssignmentCard() {
+interface AssignmentCardProps {
+  assignment: {
+    id: number;
+    name: string;
+    deadline: string;
+  };
+}
+
+export function AssignmentCard({ assignment }: AssignmentCardProps) {
   return (
     <Card>
       <CardSkeletonContainer>
         <Skeleton />
       </CardSkeletonContainer>
-      <CardTitle>Damn good card</CardTitle>
+      <CardTitle>{assignment.name}</CardTitle>
       <CardDescription>
-        A card that showcases a set of tools that you use to create your
-        product.
+        <p>ID: {assignment.id}</p>
+        <p>Due Date: {new Date(assignment.deadline).toLocaleString()}</p>
       </CardDescription>
     </Card>
   );

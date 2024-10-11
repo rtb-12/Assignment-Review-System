@@ -136,6 +136,7 @@ class AssignmentDetails(models.Model):
     assignment_id = models.AutoField(primary_key=True)
     assignor = models.ForeignKey(
         UserDetails, on_delete=models.CASCADE, db_column='Assignor_ID')
+    assignment_name = models.TextField(default='Assignment')
     assignment_description = models.TextField()
     deadline = models.DateTimeField()
     subtask_details = models.JSONField(default=list)
@@ -144,7 +145,7 @@ class AssignmentDetails(models.Model):
     class Meta:
         db_table = 'AssignmentDetails'
         indexes = [
-            models.Index(fields=['assignment_id', 'assignor', 'assignment_description',
+            models.Index(fields=['assignment_id', 'assignor', 'assignment_name', 'assignment_description',
                          'deadline', 'subtask_details'], name='assignment_details_idx'),
         ]
 

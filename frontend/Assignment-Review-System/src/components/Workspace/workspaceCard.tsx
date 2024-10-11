@@ -1,6 +1,8 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "../../lib/utils";
+import { useDispatch } from "react-redux";
+import { setWorkspaceId } from "../../features/workspace/workspaceSlice";
 
 interface WorkspaceCardProps {
   id: number;
@@ -16,9 +18,10 @@ const WorkspaceCard: React.FC<WorkspaceCardProps> = ({
   logo,
 }) => {
   const navigate = useNavigate();
-
+  const dispatch = useDispatch();
   const handleCardClick = () => {
     navigate(`/workspace/${id}`);
+    dispatch(setWorkspaceId(id.toString()));
   };
 
   return (

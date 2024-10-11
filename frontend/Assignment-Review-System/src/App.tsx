@@ -1,6 +1,9 @@
+// frontend/Assignment-Review-System/src/App.tsx
+
 import React from "react";
 import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
+import { WorkspaceProvider } from "./context/WorkspaceContext";
 import TopBar from "./components/TopBar/TopBar";
 import SignUp from "./components/SignUp/SignUp";
 import Login from "./components/Login/Login";
@@ -26,44 +29,48 @@ const AuthConsumer = ({ children }) => {
 function App() {
   return (
     <AuthProvider>
-      <Router>
-        <AuthConsumer>
-          {({ isAuthenticated }) => (
-            <>
-              {/* {isAuthenticated ? <LoggedInTopBar /> : <TopBar />} */}
-              <LoggedInTopBar />
-              <Routes>
-                <Route path="/" element={<Home />} />
-                <Route path="/signup" element={<SignUp />} />
-                <Route path="/login" element={<Login />} />
-                <Route path="/workspace" element={<Workspace />} />
-                <Route path="/workspace/:workspaceId" element={<UserPage />} />
-                <Route
-                  path="/create-assignment"
-                  element={<AssignmentCreationPage />}
-                />
-                <Route
-                  path="/assignment-submission"
-                  element={<AssignmentSubmissionPage />}
-                />
-                <Route
-                  path="/assignment-dashboard"
-                  element={<AssignmentdashboardPage />}
-                />
-                <Route
-                  path="/assignment-reviewer"
-                  element={<AssignmentReviewerCard />}
-                />
-                <Route
-                  path="/assignment-review"
-                  element={<AssignmentReviewPage />}
-                />
-                <Route path="/callback" element={<OAuthCallback />} />
-              </Routes>
-            </>
-          )}
-        </AuthConsumer>
-      </Router>
+      <WorkspaceProvider>
+        <Router>
+          <AuthConsumer>
+            {({ isAuthenticated }) => (
+              <>
+                {isAuthenticated ? <LoggedInTopBar /> : <TopBar />}
+                <Routes>
+                  <Route path="/" element={<Home />} />
+                  <Route path="/signup" element={<SignUp />} />
+                  <Route path="/login" element={<Login />} />
+                  <Route path="/workspace" element={<Workspace />} />
+                  <Route
+                    path="/workspace/:workspaceId"
+                    element={<UserPage />}
+                  />
+                  <Route
+                    path="/workspace/:workspaceId/create-assignment"
+                    element={<AssignmentCreationPage />}
+                  />
+                  <Route
+                    path="/assignment-submission"
+                    element={<AssignmentSubmissionPage />}
+                  />
+                  <Route
+                    path="/assignment-dashboard"
+                    element={<AssignmentdashboardPage />}
+                  />
+                  <Route
+                    path="/assignment-reviewer"
+                    element={<AssignmentReviewerCard />}
+                  />
+                  <Route
+                    path="/assignment-review"
+                    element={<AssignmentReviewPage />}
+                  />
+                  <Route path="/callback" element={<OAuthCallback />} />
+                </Routes>
+              </>
+            )}
+          </AuthConsumer>
+        </Router>
+      </WorkspaceProvider>
     </AuthProvider>
   );
 }

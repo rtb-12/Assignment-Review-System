@@ -1,89 +1,39 @@
-import React, {
-  createContext,
-  useContext,
-  useState,
-  ReactNode,
-  useEffect,
-} from "react";
-import axios from "axios";
-import Cookies from "js-cookie";
+// frontend/Assignment-Review-System/src/context/AuthContext.tsx
+
+import React, { createContext, useContext, ReactNode } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { RootState } from "../store/store";
+import {
+  login as loginAction,
+  logout as logoutAction,
+} from "../features/auth/authSlice";
 
 interface AuthContextProps {
   isAuthenticated: boolean;
   user: { username: string; profilePic: string } | null;
-  login: (
-    user: { username: string; profilePic: string },
-    tokens: { access: string; refresh: string; csrf: string }
-  ) => void;
+  login: (user: { username: string; profilePic: string }) => void;
   logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextProps | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [user, setUser] = useState<{
-    username: string;
-    profilePic: string;
-  } | null>(null);
+  const dispatch = useDispatch();
+  const { isAuthenticated, user } = useSelector(
+    (state: RootState) => state.auth
+  );
 
-  useEffect(() => {
-    const accessToken = Cookies.get("access_token");
-    const csrfToken = Cookies.get("csrf_token");
-    const refreshToken = Cookies.get("refresh_token");
-
-    if (accessToken && csrfToken && refreshToken) {
-      console.log("User is authenticated");
-      setIsAuthenticated(true);
-      fetchUserDetails(accessToken, csrfToken);
-    }
-  }, []);
-
-  const fetchUserDetails = async (accessToken: string, csrfToken: string) => {
-    try {
-      const response = await axios.get(
-        "http://localhost:8000/api/user/details/",
-        {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            "X-CSRFToken": csrfToken,
-          },
-        }
-      );
-      const { username, profile_pic } = response.data;
-      setUser({ username, profilePic: profile_pic });
-    } catch (error) {
-      console.error("Failed to fetch user details:", error);
-    }
-  };
-
-  const login = (
-    user: { username: string; profilePic: string },
-    tokens: { access: string; refresh: string; csrf: string }
-  ) => {
-    setIsAuthenticated(true);
-    setUser(user);
-    Cookies.set("access_token", tokens.access, {
-      sameSite: "Strict",
-      secure: true,
-    });
-    Cookies.set("refresh_token", tokens.refresh, {
-      sameSite: "Strict",
-      secure: true,
-    });
-    Cookies.set("csrf_token", tokens.csrf, {
-      sameSite: "Strict",
-      secure: true,
-    });
+  const login = (user: { username: string; profilePic: string }) => {
+    console.log("Logging in:", user);
+    dispatch(loginAction(user));
   };
 
   const logout = () => {
-    setIsAuthenticated(false);
-    setUser(null);
-    Cookies.remove("access_token");
-    Cookies.remove("refresh_token");
-    Cookies.remove("csrf_token");
+    console.log("Logging out");
+    dispatch(logoutAction());
   };
+
+  console.log("AuthContext state:", { isAuthenticated, user });
 
   return (
     <AuthContext.Provider value={{ isAuthenticated, user, login, logout }}>

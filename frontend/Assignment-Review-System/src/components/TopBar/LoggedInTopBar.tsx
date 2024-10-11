@@ -1,12 +1,13 @@
+// frontend/Assignment-Review-System/src/components/TopBar/LoggedInTopBar.tsx
+
 import React, { useState, useEffect } from "react";
 import { Button } from "../ui/button";
 import { Sun, Moon, BadgeCheck } from "lucide-react";
 import Sidebar from "./SideBar";
-import { useNavigate } from "react-router-dom";
+
 import { useAuth } from "../../context/AuthContext";
 
 const LoggedInTopBar = () => {
-  const navigate = useNavigate();
   const { user } = useAuth();
   const [isDarkMode, setIsDarkMode] = useState(false);
 
@@ -22,10 +23,8 @@ const LoggedInTopBar = () => {
   const toggleDarkMode = () => {
     setIsDarkMode(!isDarkMode);
   };
-
   return (
     <div className="flex justify-between items-center p-4 bg-lightBg text-lightText dark:bg-darkBg dark:text-darkText w-full">
-      {/* Sidebar */}
       <div className="flex flex-row items-center space-x-2 gap-1">
         <Sidebar />
         <div className=" flex gap-2">
@@ -34,7 +33,6 @@ const LoggedInTopBar = () => {
         </div>
       </div>
 
-      {/* Logo and User Profile */}
       <div className="flex items-center space-x-6">
         <Button
           onClick={toggleDarkMode}

@@ -8,12 +8,28 @@ import {
   IconCheck,
 } from "@tabler/icons-react";
 import { motion } from "framer-motion";
+import { useNavigate } from "react-router-dom";
+import { useSelector } from "react-redux";
+import { RootState } from "../../store/store";
 
 const Sidebar = () => {
   const [isOpen, setIsOpen] = useState(false);
-
+  const navigate = useNavigate();
+  const workspaceId = useSelector(
+    (state: RootState) => state.workspace.workspaceId
+  );
+  console.log("Fetched workspaceId from Redux store:", workspaceId);
   const toggleSidebar = () => {
     setIsOpen(!isOpen);
+  };
+
+  const handleCreateAssignmentClick = () => {
+    console.log("Button clicked, workspaceId:", workspaceId);
+    if (workspaceId) {
+      navigate(`/workspace/${workspaceId}/create-assignment`);
+    } else {
+      console.error("Workspace ID not found");
+    }
   };
 
   return (
@@ -47,12 +63,15 @@ const Sidebar = () => {
 
         {/* Menu items */}
         <ul className="p-4 space-y-4">
-          {/* List items with improved spacing, padding, and font size */}
           <li className="flex items-center py-3 px-4 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition duration-200">
             <IconUser className="h-5 w-5 mr-3" />
             <span className="text-base">Profile</span>
           </li>
-          <li className="flex items-center py-3 px-4 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition duration-200">
+          <li
+            className="flex items-center py-3 px-4 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition duration-200 cursor-pointer"
+            role="button"
+            onClick={handleCreateAssignmentClick}
+          >
             <IconFilePlus className="h-5 w-5 mr-3" />
             <span className="text-base">Create Assignment</span>
           </li>
