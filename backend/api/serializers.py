@@ -242,3 +242,12 @@ class AssignmentDetailsSerializer(serializers.ModelSerializer):
     class Meta:
         model = AssignmentDetails
         fields = '__all__'
+
+
+class AssignmentRolesSerializer(serializers.ModelSerializer):
+    assignment_id = serializers.IntegerField(source='assignment.assignment_id')
+    user_id = serializers.IntegerField(source='user.user_id')
+
+    class Meta:
+        model = AssignmentRoles
+        fields = ['assignment_id', 'user_id', 'role_id']

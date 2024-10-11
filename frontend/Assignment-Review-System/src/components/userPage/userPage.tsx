@@ -1,6 +1,6 @@
 import React from "react";
 import Leaderboard from "./leaderboard";
-import { TabsDemo } from "./Tabs";
+import { TabsUser } from "./Tabs";
 
 const UserPage = () => {
   return (
@@ -15,7 +15,7 @@ const UserPage = () => {
           User Dashboard
         </h1>
         {/* Tabs with content inside */}
-        <TabsDemo />
+        <TabsUser />
       </div>
     </div>
   );

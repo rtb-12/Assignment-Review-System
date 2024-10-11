@@ -16,6 +16,7 @@ from rest_framework_simplejwt.authentication import JWTAuthentication  # type: i
 from rest_framework_simplejwt.tokens import RefreshToken  # type: ignore
 from django.middleware.csrf import CsrfViewMiddleware, get_token  # type: ignore
 from django.db.models import Sum
+from django.utils import timezone
 from .models import (AssignmentDetails, AssignmentRoles, AssignmentStatus, GroupDetails, WorkspaceDetail,
                      UserDetails,
                      WorkspaceMembers,
@@ -167,6 +168,7 @@ class UserDetailsView(generics.GenericAPIView):
     def get(self, request):
         user = request.user
         user_details = {
+            "user_id": user.user_id,
             "username": user.name,
             "profile_pic": user.profile_image.url if user.profile_image else None,
         }
@@ -421,9 +423,20 @@ class AssignmentSubmissionView(generics.UpdateAPIView):
 
 class LeaderboardView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
 
-    def get(self, request):
-        leaderboard_data = AssignmentStatus.objects.select_related('user').values(
+    def get(self, request, workspace_id):
+        try:
+            workspace = WorkspaceDetail.objects.get(workspace_id=workspace_id)
+        except WorkspaceDetail.DoesNotExist:
+            return Response({"detail": "Workspace not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        # Get the list of users who are members of the workspace
+        user_ids = WorkspaceMembers.objects.filter(
+            workspace_id=workspace_id).values_list('user_id', flat=True)
+
+        # Filter the AssignmentStatus entries based on these users
+        leaderboard_data = AssignmentStatus.objects.filter(user_id__in=user_ids).select_related('user').values(
             'user__name', 'user__profile_image').annotate(points=Sum('points_assign')).order_by('-points')
 
         leaderboard = [

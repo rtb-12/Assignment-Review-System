@@ -1,7 +1,9 @@
+// frontend/Assignment-Review-System/src/components/Workspace/Workspace.tsx
+
 import React, { useState, useEffect } from "react";
 import Cookies from "js-cookie";
 import { TypewriterEffect } from "../ui/typewriter-effect";
-import WorkspaceCard from "./workspaceCard";
+import WorkspaceCard from "./WorkspaceCard";
 import { IconPlus } from "@tabler/icons-react";
 import Modal from "../ui/Modal";
 import {
@@ -15,8 +17,13 @@ import {
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { Button } from "../ui/button";
+import { useSelector } from "react-redux";
+import { RootState } from "../../store/store";
 
 const Workspace = () => {
+  const workspaceId = useSelector(
+    (state: RootState) => state.workspace.workspaceId
+  );
   const [showCards, setShowCards] = useState(false);
   const [cardsVisible, setCardsVisible] = useState<number[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -117,31 +124,26 @@ const Workspace = () => {
       {/* Adjusting gap between text and cards for mobile responsiveness */}
       <div className="flex flex-wrap justify-center gap-4 mt-20 md:mt-12 w-full px-4">
         {showCards &&
-          workspaces.map(
-            (workspace, index) => (
-              console.log(workspace),
-              (
-                <div
-                  key={index}
-                  className={`transition-opacity duration-500 ease-out transform ${
-                    cardsVisible.includes(index)
-                      ? "opacity-100 scale-100"
-                      : "opacity-0 scale-50"
-                  }`}
-                  style={{
-                    transitionDelay: `${index * 300}ms`,
-                  }}
-                >
-                  <WorkspaceCard
-                    name={workspace.workspace_name}
-                    description={workspace.workspace_description}
-                    logo={workspace.workspace_logo_image}
-                    id={workspace.workspace_id}
-                  />
-                </div>
-              )
-            )
-          )}
+          workspaces.map((workspace, index) => (
+            <div
+              key={index}
+              className={`transition-opacity duration-500 ease-out transform ${
+                cardsVisible.includes(index)
+                  ? "opacity-100 scale-100"
+                  : "opacity-0 scale-50"
+              }`}
+              style={{
+                transitionDelay: `${index * 300}ms`,
+              }}
+            >
+              <WorkspaceCard
+                name={workspace.workspace_name}
+                description={workspace.workspace_description}
+                logo={workspace.workspace_logo_image}
+                id={workspace.workspace_id}
+              />
+            </div>
+          ))}
       </div>
 
       {/* Floating Action Button for creating a workspace */}
@@ -199,10 +201,7 @@ const Workspace = () => {
               </div>
             </form>
           </CardContent>
-          <CardFooter className="flex justify-between">
-            <Button variant="outline" onClick={closeModal}>
-              Cancel
-            </Button>
+          <CardFooter>
             <Button onClick={handleCreateWorkspace}>Create</Button>
           </CardFooter>
         </Card>

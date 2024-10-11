@@ -1,4 +1,5 @@
-"use client";
+// frontend/Assignment-Review-System/src/components/Login/Login.tsx
+
 import React, { useState } from "react";
 import { Label } from "../ui/label";
 import { Input } from "../ui/input";
@@ -8,9 +9,11 @@ import { IconBrandGoogle } from "@tabler/icons-react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import Cookies from "js-cookie";
+import { useAuth } from "../../context/AuthContext";
 
 const Login = () => {
   const navigate = useNavigate();
+  const { login } = useAuth();
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -42,7 +45,34 @@ const Login = () => {
 
       if (response.status === 200) {
         console.log("Login successful");
-        navigate("/workspace");
+
+        // Store tokens in cookies
+        // Cookies.set("access_token", response.data.access);
+        // Cookies.set("refresh_token", response.data.refresh);
+
+        // Fetch user details
+        const userDetailsResponse = await axios.get(
+          "http://localhost:8000/api/user/details/",
+          {
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${Cookies.get("access_token")}`,
+            },
+            withCredentials: true,
+          }
+        );
+
+        if (userDetailsResponse.status === 200) {
+          const user = userDetailsResponse.data;
+
+          // Call the login function from AuthContext
+          login(user);
+
+          navigate("/workspace");
+        } else {
+          console.error("Failed to fetch user details");
+          setError("Failed to fetch user details.");
+        }
       } else {
         console.error("Error during login");
         setError("Invalid email or password.");
