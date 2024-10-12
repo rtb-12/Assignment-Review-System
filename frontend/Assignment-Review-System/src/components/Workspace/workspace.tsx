@@ -1,9 +1,7 @@
-// frontend/Assignment-Review-System/src/components/Workspace/Workspace.tsx
-
 import React, { useState, useEffect } from "react";
 import Cookies from "js-cookie";
 import { TypewriterEffect } from "../ui/typewriter-effect";
-import WorkspaceCard from "./WorkspaceCard";
+import WorkspaceCard from "./workspaceCard";
 import { IconPlus } from "@tabler/icons-react";
 import Modal from "../ui/Modal";
 import {
@@ -33,7 +31,6 @@ const Workspace = () => {
   const [workspaces, setWorkspaces] = useState([]);
 
   useEffect(() => {
-    // Fetch user workspaces
     const fetchWorkspaces = async () => {
       try {
         const response = await fetch(
@@ -61,13 +58,12 @@ const Workspace = () => {
     fetchWorkspaces();
   }, []);
 
-  // Animating cards row by row (populating from the center)
   useEffect(() => {
     if (showCards) {
       workspaces.forEach((_, index) => {
         setTimeout(() => {
           setCardsVisible((prev) => [...prev, index]);
-        }, index * 300); // Delay between each card
+        }, index * 300);
       });
     }
   }, [showCards, workspaces]);
@@ -121,7 +117,6 @@ const Workspace = () => {
         />
       </div>
 
-      {/* Adjusting gap between text and cards for mobile responsiveness */}
       <div className="flex flex-wrap justify-center gap-4 mt-20 md:mt-12 w-full px-4">
         {showCards &&
           workspaces.map((workspace, index) => (
@@ -146,7 +141,6 @@ const Workspace = () => {
           ))}
       </div>
 
-      {/* Floating Action Button for creating a workspace */}
       <button
         className="fixed bottom-8 right-8 bg-blue-500 hover:bg-blue-600 text-white rounded-full p-4 shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
         onClick={openModal}
@@ -157,7 +151,6 @@ const Workspace = () => {
         Create a Workspace
       </span>
 
-      {/* Modal for creating a workspace */}
       <Modal isOpen={isModalOpen} onClose={closeModal}>
         <Card className="w-[450px]">
           <CardHeader>

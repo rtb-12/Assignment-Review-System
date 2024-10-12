@@ -1,5 +1,3 @@
-// frontend/Assignment-Review-System/src/components/Login/Login.tsx
-
 import React, { useState } from "react";
 import { Label } from "../ui/label";
 import { Input } from "../ui/input";
@@ -9,11 +7,12 @@ import { IconBrandGoogle } from "@tabler/icons-react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import Cookies from "js-cookie";
-import { useAuth } from "../../context/AuthContext";
+import { useDispatch } from "react-redux";
+import { login as loginAction } from "../../features/auth/authSlice";
 
 const Login = () => {
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const dispatch = useDispatch();
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -56,7 +55,7 @@ const Login = () => {
           {
             headers: {
               "Content-Type": "application/json",
-              Authorization: `Bearer ${Cookies.get("access_token")}`,
+              Authorization: `Bearer ${Cookies.get("access")}`,
             },
             withCredentials: true,
           }
@@ -65,8 +64,8 @@ const Login = () => {
         if (userDetailsResponse.status === 200) {
           const user = userDetailsResponse.data;
 
-          // Call the login function from AuthContext
-          login(user);
+          // Dispatch the login action
+          dispatch(loginAction(user));
 
           navigate("/workspace");
         } else {

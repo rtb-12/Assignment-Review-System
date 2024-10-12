@@ -1,4 +1,5 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
+import Cookies from "js-cookie";
 
 interface AuthState {
   isAuthenticated: boolean;
@@ -6,8 +7,8 @@ interface AuthState {
 }
 
 const initialState: AuthState = {
-  isAuthenticated: !!localStorage.getItem("isAuthenticated"),
-  user: JSON.parse(localStorage.getItem("user") || "null"),
+  isAuthenticated: !!Cookies.get("isAuthenticated"),
+  user: JSON.parse(Cookies.get("user") || "null"),
 };
 
 const authSlice = createSlice({
@@ -17,14 +18,14 @@ const authSlice = createSlice({
     login: (state, action: PayloadAction<any>) => {
       state.isAuthenticated = true;
       state.user = action.payload;
-      localStorage.setItem("isAuthenticated", "true");
-      localStorage.setItem("user", JSON.stringify(action.payload));
+      Cookies.set("isAuthenticated", "true");
+      Cookies.set("user", JSON.stringify(action.payload));
     },
     logout: (state) => {
       state.isAuthenticated = false;
       state.user = null;
-      localStorage.removeItem("isAuthenticated");
-      localStorage.removeItem("user");
+      Cookies.remove("isAuthenticated");
+      Cookies.remove("user");
     },
   },
 });

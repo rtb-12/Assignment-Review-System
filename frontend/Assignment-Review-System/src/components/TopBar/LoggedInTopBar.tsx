@@ -4,11 +4,11 @@ import React, { useState, useEffect } from "react";
 import { Button } from "../ui/button";
 import { Sun, Moon, BadgeCheck } from "lucide-react";
 import Sidebar from "./SideBar";
-
-import { useAuth } from "../../context/AuthContext";
+import { useSelector } from "react-redux";
+import { RootState } from "../../store/store";
 
 const LoggedInTopBar = () => {
-  const { user } = useAuth();
+  const { user } = useSelector((state: RootState) => state.auth);
   const [isDarkMode, setIsDarkMode] = useState(false);
 
   useEffect(() => {
@@ -23,6 +23,7 @@ const LoggedInTopBar = () => {
   const toggleDarkMode = () => {
     setIsDarkMode(!isDarkMode);
   };
+
   return (
     <div className="flex justify-between items-center p-4 bg-lightBg text-lightText dark:bg-darkBg dark:text-darkText w-full">
       <div className="flex flex-row items-center space-x-2 gap-1">

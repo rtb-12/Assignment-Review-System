@@ -19,6 +19,7 @@ const WorkspaceCard: React.FC<WorkspaceCardProps> = ({
 }) => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
+
   const handleCardClick = () => {
     navigate(`/workspace/${id}`);
     dispatch(setWorkspaceId(id.toString()));

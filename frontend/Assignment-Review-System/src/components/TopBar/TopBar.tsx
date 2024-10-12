@@ -1,14 +1,17 @@
-// frontend/Assignment-Review-System/src/components/TopBar/TopBar.tsx
-
-import { useAuth } from "../../context/AuthContext";
+import { useSelector, useDispatch } from "react-redux";
+import { RootState } from "../../store/store";
 import { Button } from "../ui/button";
 import { Sun, Moon, BadgeCheck } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
+import { logout as logoutAction } from "../../features/auth/authSlice";
 
 const TopBar = () => {
   const navigate = useNavigate();
-  const { isAuthenticated, user, logout } = useAuth();
+  const dispatch = useDispatch();
+  const { isAuthenticated, user } = useSelector(
+    (state: RootState) => state.auth
+  );
   const [isDarkMode, setIsDarkMode] = useState(false);
 
   useEffect(() => {
@@ -22,6 +25,10 @@ const TopBar = () => {
 
   const toggleDarkMode = () => {
     setIsDarkMode(!isDarkMode);
+  };
+
+  const handleLogout = () => {
+    dispatch(logoutAction());
   };
 
   return (
@@ -52,7 +59,7 @@ const TopBar = () => {
               {user?.username || "User"}
             </span>
             <Button
-              onClick={logout}
+              onClick={handleLogout}
               className="bg-red-500 hover:bg-red-600 text-white"
             >
               Logout
