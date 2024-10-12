@@ -133,6 +133,8 @@ class GroupMembers(models.Model):
 
 
 class AssignmentDetails(models.Model):
+    workspace_id = models.ForeignKey(
+        WorkspaceDetail, on_delete=models.CASCADE, db_column='workspace_id')
     assignment_id = models.AutoField(primary_key=True)
     assignor = models.ForeignKey(
         UserDetails, on_delete=models.CASCADE, db_column='Assignor_ID')
@@ -145,7 +147,7 @@ class AssignmentDetails(models.Model):
     class Meta:
         db_table = 'AssignmentDetails'
         indexes = [
-            models.Index(fields=['assignment_id', 'assignor', 'assignment_name', 'assignment_description',
+            models.Index(fields=['workspace_id', 'assignment_id', 'assignor', 'assignment_name', 'assignment_description',
                          'deadline', 'subtask_details'], name='assignment_details_idx'),
         ]
 

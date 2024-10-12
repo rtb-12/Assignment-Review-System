@@ -178,12 +178,6 @@ class AssignmentCreateSerializer(serializers.ModelSerializer):
         return path
 
 
-class AssignmentRoleSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = AssignmentRoles
-        fields = ['assignment_id', 'user_id', 'role_id']
-
-
 class AssignmentSubmissionSerializer(serializers.ModelSerializer):
     submission_attachments = serializers.ListField(
         child=serializers.FileField(), required=False)
@@ -244,10 +238,87 @@ class AssignmentDetailsSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
-class AssignmentRolesSerializer(serializers.ModelSerializer):
+class AssignmentRoleSerializer(serializers.ModelSerializer):
     assignment_id = serializers.IntegerField(source='assignment.assignment_id')
     user_id = serializers.IntegerField(source='user.user_id')
 
     class Meta:
         model = AssignmentRoles
         fields = ['assignment_id', 'user_id', 'role_id']
+
+
+class GroupSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = GroupDetails
+        fields = ['groupID', 'groupName', 'workspace_id']
+
+
+class UserProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserDetails
+        fields = ['user_id', 'name', 'email', 'profile_image']
+
+
+class AssignmentRevieweeViewSerializer(serializers.ModelSerializer):
+    points = serializers.SerializerMethodField()
+    status = serializers.SerializerMethodField()
+    profile_img = serializers.ImageField(source='profile_image')
+
+    class Meta:
+        model = UserDetails
+        fields = ['name', 'profile_img', 'points', 'status']
+
+    def get_points(self, obj):
+        assignment_id = self.context.get('assignment_id')
+        assignment_status = AssignmentStatus.objects.filter(
+            user=obj, assignment_id=assignment_id).first()
+        return assignment_status.points_assign if assignment_status else None
+
+    def get_status(self, obj):
+        assignment_id = self.context.get('assignment_id')
+        assignment_status = AssignmentStatus.objects.filter(
+            user=obj, assignment_id=assignment_id).first()
+        return assignment_status.status if assignment_status else None
+
+
+class AssignmentDetailsViewSerializer(serializers.ModelSerializer):
+    assignor = UserProfileSerializer()
+    subtask_details = serializers.JSONField()
+    attachments = serializers.JSONField()
+
+    class Meta:
+        model = AssignmentDetails
+        fields = [
+            'assignment_id',
+            'assignment_name',
+            'assignment_description',
+            'subtask_details',
+            'deadline',
+            'attachments'
+        ]
+
+
+class AssignmentSubtaskUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AssignmentStatus
+        fields = ['status', 'points_assign', 'task_id']
+
+    def update(self, instance, validated_data):
+        instance.status = validated_data.get('status', instance.status)
+        instance.points_assign = validated_data.get(
+            'points_assign', instance.points_assign)
+        instance.task_id = validated_data.get('task_id', instance.task_id)
+        instance.save()
+        return instance
+
+
+class AssignmentFeedbackSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AssignmentStatus
+        fields = ['feedback_details']
+
+    def update(self, instance, validated_data):
+        instance.feedback_details = validated_data.get(
+            'feedback_details', instance.feedback_details)
+        instance.save()
+        return instance
