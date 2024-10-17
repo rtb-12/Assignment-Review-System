@@ -6,11 +6,23 @@ import { Sun, Moon, BadgeCheck } from "lucide-react";
 import Sidebar from "./SideBar";
 import { useSelector } from "react-redux";
 import { RootState } from "../../store/store";
+import { useNavigate } from "react-router-dom";
 
 const LoggedInTopBar = () => {
   const { user } = useSelector((state: RootState) => state.auth);
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const workspaceId = useSelector(
+    (state: RootState) => state.workspace.workspaceId
+  );
+  const navigate = useNavigate();
 
+  const handleClickOnLogo = () => {
+    if (user) {
+      navigate(`workspace/${workspaceId}`);
+    } else {
+      navigate("/");
+    }
+  };
   useEffect(() => {
     const root = window.document.documentElement;
     if (isDarkMode) {
@@ -28,9 +40,9 @@ const LoggedInTopBar = () => {
     <div className="flex justify-between items-center p-4 bg-lightBg text-lightText dark:bg-darkBg dark:text-darkText w-full">
       <div className="flex flex-row items-center space-x-2 gap-1">
         <Sidebar />
-        <div className=" flex gap-2">
+        <div className=" flex gap-2" onClick={handleClickOnLogo}>
           <BadgeCheck className="h-6 w-6 text-blue-500" />
-          <span className="text-xl font-semibold">Assignly</span>
+          <span className="text-xl font-semibold cursor-pointer">Assignly</span>
         </div>
       </div>
 
@@ -48,7 +60,7 @@ const LoggedInTopBar = () => {
 
         <div className="flex items-center space-x-3 p-2 bg-gray-100 dark:bg-gray-700 rounded-lg cursor-pointer">
           <img
-            src={user?.profilePic || "https://via.placeholder.com/40x40"}
+            src={user?.profile_pic || "https://via.placeholder.com/40x40"}
             alt={user?.username || "User"}
             className="w-10 h-10 rounded-full object-cover"
           />

@@ -1,9 +1,10 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { ComboboxDemo } from "./ComboBox";
 import { DatePickerWithPresets } from "./Calendar";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+import { Input } from "../../components/ui/input";
+import { Button } from "../../components/ui/button";
 import { FileUploadCreation } from "./FileUpload";
+import Cookies from "js-cookie";
 import {
   Table,
   TableBody,
@@ -11,7 +12,11 @@ import {
   TableHeader,
   TableRow,
   TableHead,
-} from "@/components/ui/table";
+} from "../../components/ui/table";
+import { useDispatch, useSelector } from "react-redux";
+import { RootState } from "../../store/store";
+import { useParams } from "react-router-dom";
+import { setWorkspaceId } from "../../features/workspace/workspaceSlice";
 
 const Textarea = ({ value, onChange, className, ...props }) => (
   <textarea
@@ -25,14 +30,60 @@ const Textarea = ({ value, onChange, className, ...props }) => (
 const AssignmentCreationPage = () => {
   const [assignmentName, setAssignmentName] = useState("");
   const [assignmentDescription, setAssignmentDescription] = useState("");
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   const [subtasks, setSubtasks] = useState([{ description: "", points: "" }]);
+  const [members, setMembers] = useState([]);
+  const [groups, setGroups] = useState([]);
+  const [selectedMembers, setSelectedMembers] = useState([]);
+  const [selectedGroups, setSelectedGroups] = useState([]);
+  const [deadline, setDeadline] = useState<Date | null>(null);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      setFile(e.target.files[0]);
+  const dispatch = useDispatch();
+  const { workspaceId: paramWorkspaceId } = useParams<{
+    workspaceId: string;
+  }>();
+
+  let workspaceId = useSelector(
+    (state: RootState) => state.workspace.workspaceId
+  );
+
+  useEffect(() => {
+    if (!workspaceId && paramWorkspaceId) {
+      dispatch(setWorkspaceId(paramWorkspaceId));
+      workspaceId = paramWorkspaceId;
+      // console.log("workspaceId(in Assignment Creation Page): " + workspaceId);
+
+      const fetchMembersAndGroups = async () => {
+        try {
+          const membersResponse = await fetch(
+            `http://localhost:8000/api/workspace/${workspaceId}/members/`,
+            {
+              headers: {
+                Authorization: `Bearer ${Cookies.get("access")}`,
+              },
+            }
+          );
+          const membersData = await membersResponse.json();
+          setMembers(membersData);
+
+          const groupsResponse = await fetch(
+            `http://localhost:8000/api/workspace/${workspaceId}/groups/`,
+            {
+              headers: {
+                Authorization: `Bearer ${Cookies.get("access")}`,
+              },
+            }
+          );
+          const groupsData = await groupsResponse.json();
+          setGroups(groupsData);
+        } catch (error) {
+          console.error("Error fetching members and groups:", error);
+        }
+      };
+
+      fetchMembersAndGroups();
     }
-  };
+  }, [workspaceId, paramWorkspaceId, dispatch]);
 
   const handleSubtaskChange = (index: number, field: string, value: string) => {
     const newSubtasks = [...subtasks];
@@ -44,31 +95,38 @@ const AssignmentCreationPage = () => {
     setSubtasks([...subtasks, { description: "", points: "" }]);
   };
 
-  const handleSubmit = () => {
-    console.log({
-      assignmentName,
-      assignmentDescription,
-      file,
-      subtasks,
-    });
+  const handleSubmit = async () => {
+    const payload = {
+      assignment_name: assignmentName,
+      assignment_description: assignmentDescription,
+      deadline: deadline ? deadline.toISOString() : null,
+      subtask_details: subtasks,
+      attachments: files,
+      individual_members: selectedMembers,
+      group_ids: selectedGroups,
+    };
+    console.log(payload);
+    // try {
+    //   const response = await fetch(
+    //     "http://localhost:8000/api/assignments/create/",
+    //     {
+    //       method: "POST",
+    //       headers: {
+    //         Authorization: `Bearer ${Cookies.get("access")}`,
+    //       },
+    //       body: formData,
+    //     }
+    //   );
+    //   // Handle response
+    //   const result = await response.json();
+    //   console.log(result);
+    // } catch (error) {
+    //   console.error("Error submitting assignment:", error);
+    // }
   };
-
-  // Sample data for table
-  const candidates = [
-    { sno: 1, avatar: "👤", name: "John Doe" },
-    { sno: 2, avatar: "👤", name: "Jane Smith" },
-    { sno: 3, avatar: "👤", name: "David Miller" },
-    { sno: 4, avatar: "👤", name: "Emily Johnson" },
-    { sno: 5, avatar: "👤", name: "Mark Lee" },
-    { sno: 5, avatar: "👤", name: "Mark Lee" },
-    { sno: 5, avatar: "👤", name: "Mark Lee" },
-    { sno: 5, avatar: "👤", name: "Mark Lee" },
-    { sno: 5, avatar: "👤", name: "Mark Lee" },
-  ];
 
   return (
     <div className="p-8 flex">
-      {/* 3/4th width for input form */}
       <div className="w-3/4 pr-8">
         <div className="flex justify-between items-center mb-4">
           <h1 className="text-[2.5rem] font-bold">Create an Assignment</h1>
@@ -97,7 +155,7 @@ const AssignmentCreationPage = () => {
           />
         </div>
         <div className="mb-4">
-          <FileUploadCreation />
+          <FileUploadCreation setFiles={setFiles} />
         </div>
         <h2 className="text-xl font-bold mb-2">Create Subtask</h2>
         {subtasks.map((subtask, index) => (
@@ -130,19 +188,29 @@ const AssignmentCreationPage = () => {
         </Button>
       </div>
 
-      {/* 1/4th width for right-side options */}
       <div className="w-1/4">
         <h2 className="text-lg font-bold">Overall Deadline</h2>
-        <DatePickerWithPresets />
-
+        <DatePickerWithPresets setDate={setDeadline} />
         <h2 className="text-lg font-bold mt-4">Assign Reviewers</h2>
-        <ComboboxDemo />
+        <ComboboxDemo
+          options={members}
+          selectedOptions={selectedMembers}
+          setSelectedOptions={setSelectedMembers}
+        />
 
         <h2 className="text-lg font-bold mt-4">Assign Students</h2>
-        <ComboboxDemo />
+        <ComboboxDemo
+          options={members}
+          selectedOptions={selectedMembers}
+          setSelectedOptions={setSelectedMembers}
+        />
 
         <h2 className="text-lg font-bold mt-4">Assign Group</h2>
-        <ComboboxDemo />
+        <ComboboxDemo
+          options={groups}
+          selectedOptions={selectedGroups}
+          setSelectedOptions={setSelectedGroups}
+        />
 
         <h2 className="text-lg font-bold mt-4">Assigned Candidates</h2>
         <div className="overflow-y-scroll h-[17rem] mt-2 border border-gray-300 rounded">
@@ -155,13 +223,13 @@ const AssignmentCreationPage = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {candidates.map((candidate) => (
+              {/* {candidates.map((candidate) => (
                 <TableRow key={candidate.sno}>
                   <TableCell>{candidate.sno}</TableCell>
                   <TableCell>{candidate.avatar}</TableCell>
                   <TableCell>{candidate.name}</TableCell>
                 </TableRow>
-              ))}
+              ))} */}
             </TableBody>
           </Table>
         </div>

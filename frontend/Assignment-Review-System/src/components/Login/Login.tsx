@@ -49,7 +49,6 @@ const Login = () => {
         // Cookies.set("access_token", response.data.access);
         // Cookies.set("refresh_token", response.data.refresh);
 
-        // Fetch user details
         const userDetailsResponse = await axios.get(
           "http://localhost:8000/api/user/details/",
           {
@@ -64,7 +63,6 @@ const Login = () => {
         if (userDetailsResponse.status === 200) {
           const user = userDetailsResponse.data;
 
-          // Dispatch the login action
           dispatch(loginAction(user));
 
           navigate("/workspace");

@@ -2,10 +2,12 @@ import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 
 interface WorkspaceState {
   workspaceId: string;
+  isAdmin: boolean;
 }
 
 const initialState: WorkspaceState = {
   workspaceId: "",
+  isAdmin: false,
 };
 
 const workspaceSlice = createSlice({
@@ -15,9 +17,12 @@ const workspaceSlice = createSlice({
     setWorkspaceId: (state, action: PayloadAction<string>) => {
       state.workspaceId = action.payload;
     },
+    setIsAdmin: (state, action: PayloadAction<boolean>) => {
+      state.isAdmin = action.payload;
+    },
   },
 });
 
-export const { setWorkspaceId } = workspaceSlice.actions;
+export const { setWorkspaceId, setIsAdmin } = workspaceSlice.actions;
 
 export default workspaceSlice.reducer;

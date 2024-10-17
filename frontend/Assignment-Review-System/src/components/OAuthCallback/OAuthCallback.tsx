@@ -1,9 +1,12 @@
 import React, { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Cookies from "js-cookie";
+import { useDispatch } from "react-redux";
+import { login } from "../../features/auth/authSlice";
 
 const OAuthCallback = () => {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
 
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -11,23 +14,28 @@ const OAuthCallback = () => {
     const state = urlParams.get("state");
 
     if (code) {
-      // Send the code to the backend to exchange for tokens
       fetch(`http://localhost:8000/callback/?code=${code}&state=${state}`, {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
         },
-        credentials: "include", // Ensure cookies are included in the request
+        credentials: "include",
       })
         .then((response) => response.json())
         .then((data) => {
           if (data.access && data.refresh) {
-            // Store tokens in cookies
-            Cookies.set("access_token", data.access);
-            Cookies.set("refresh_token", data.refresh);
-            Cookies.set("csrf_token", data.csrf_token);
+            Cookies.set("access", data.access);
+            Cookies.set("refresh", data.refresh);
+            console.log(JSON.stringify(data));
+            dispatch(
+              login({
+                user_id: data.user_id,
+                username: data.name,
+                email: data.email,
+                profilePic: data.profile_image,
+              })
+            );
 
-            // Redirect to workspace
             navigate("/workspace");
           } else {
             console.error("Failed to obtain tokens:", data);
@@ -37,7 +45,7 @@ const OAuthCallback = () => {
           console.error("Error during OAuth callback:", error);
         });
     }
-  }, [navigate]);
+  }, [navigate, dispatch]);
 
   return <div>Loading...</div>;
 };

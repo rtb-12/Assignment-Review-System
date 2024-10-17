@@ -15,21 +15,28 @@ import {
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { Button } from "../ui/button";
-import { useSelector } from "react-redux";
-import { RootState } from "../../store/store";
+import axios from "axios";
+
+interface Workspace {
+  workspace_name: string;
+  workspace_description: string;
+  workspace_logo_image: string;
+  workspace_id: number;
+}
 
 const Workspace = () => {
-  const workspaceId = useSelector(
-    (state: RootState) => state.workspace.workspaceId
-  );
   const [showCards, setShowCards] = useState(false);
   const [cardsVisible, setCardsVisible] = useState<number[]>([]);
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isJoinModalOpen, setIsJoinModalOpen] = useState(false);
   const [workspaceName, setWorkspaceName] = useState("");
   const [workspaceDescription, setWorkspaceDescription] = useState("");
   const [workspaceLogo, setWorkspaceLogo] = useState<File | null>(null);
-  const [workspaces, setWorkspaces] = useState([]);
+  const [workspaceCode, setWorkspaceCode] = useState("");
 
+  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
+
+  // Fetch workspaces
   useEffect(() => {
     const fetchWorkspaces = async () => {
       try {
@@ -58,6 +65,7 @@ const Workspace = () => {
     fetchWorkspaces();
   }, []);
 
+  // Show workspaces in sequence
   useEffect(() => {
     if (showCards) {
       workspaces.forEach((_, index) => {
@@ -68,9 +76,13 @@ const Workspace = () => {
     }
   }, [showCards, workspaces]);
 
-  const openModal = () => setIsModalOpen(true);
-  const closeModal = () => setIsModalOpen(false);
+  const openCreateModal = () => setIsCreateModalOpen(true);
+  const closeCreateModal = () => setIsCreateModalOpen(false);
 
+  const openJoinModal = () => setIsJoinModalOpen(true);
+  const closeJoinModal = () => setIsJoinModalOpen(false);
+
+  // Create Workspace
   const handleCreateWorkspace = async () => {
     const formData = new FormData();
     formData.append("workspace_name", workspaceName);
@@ -94,7 +106,7 @@ const Workspace = () => {
       if (response.ok) {
         const newWorkspace = await response.json();
         setWorkspaces((prev) => [...prev, newWorkspace]);
-        closeModal();
+        closeCreateModal();
       } else {
         console.error("Failed to create workspace");
       }
@@ -103,20 +115,57 @@ const Workspace = () => {
     }
   };
 
+  // Join Workspace
+  const handleJoinWorkspace = async () => {
+    try {
+      const response = await axios.post(
+        "http://localhost:8000/api/workspace/join/",
+        {
+          token: workspaceCode,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${Cookies.get("access")}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (response.status === 200) {
+        console.log("Successfully joined the workspace:", response.data);
+        closeJoinModal();
+      } else {
+        console.error("Failed to join the workspace:", response.data);
+      }
+    } catch (error) {
+      console.error("Error joining the workspace:", error);
+    }
+  };
+
   return (
     <div className="relative flex flex-col items-center justify-center min-h-screen p-4 bg-lightBg text-lightText dark:bg-darkBg dark:text-darkText">
-      <div className="absolute top-8 md:top-16 left-4 md:left-10 text-center md:text-left">
+      {/* Header */}
+      <div className="flex flex-col w-[90%] md:flex-row justify-between items-center absolute top-8 md:top-16 left-4 md:left-10 text-center md:text-left space-y-4 md:space-y-0">
         <TypewriterEffect
           words={[
             { text: "Select" },
             { text: "A" },
             { text: "Workspace", className: "text-blue-500" },
           ]}
-          className="text-2xl md:text-3xl font-bold "
+          className="text-2xl md:text-3xl font-bold"
           cursorClassName="bg-blue-500"
         />
+        <div className="md:absolute md:right-0 md:mr-4">
+          <Button
+            className="h-[2.75rem] bg-blue-500 text-white px-4 py-2 rounded"
+            onClick={openJoinModal}
+          >
+            Join A Workspace
+          </Button>
+        </div>
       </div>
 
+      {/* Display workspace cards */}
       <div className="flex flex-wrap justify-center gap-4 mt-20 md:mt-12 w-full px-4">
         {showCards &&
           workspaces.map((workspace, index) => (
@@ -141,9 +190,10 @@ const Workspace = () => {
           ))}
       </div>
 
+      {/* Button to create a new workspace */}
       <button
         className="fixed bottom-8 right-8 bg-blue-500 hover:bg-blue-600 text-white rounded-full p-4 shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
-        onClick={openModal}
+        onClick={openCreateModal}
       >
         <IconPlus size={24} />
       </button>
@@ -151,7 +201,8 @@ const Workspace = () => {
         Create a Workspace
       </span>
 
-      <Modal isOpen={isModalOpen} onClose={closeModal}>
+      {/* Modal for creating workspace */}
+      <Modal isOpen={isCreateModalOpen} onClose={closeCreateModal}>
         <Card className="w-[450px]">
           <CardHeader>
             <CardTitle>Create Workspace</CardTitle>
@@ -196,6 +247,34 @@ const Workspace = () => {
           </CardContent>
           <CardFooter>
             <Button onClick={handleCreateWorkspace}>Create</Button>
+          </CardFooter>
+        </Card>
+      </Modal>
+
+      {/* Modal for joining workspace */}
+      <Modal isOpen={isJoinModalOpen} onClose={closeJoinModal}>
+        <Card className="w-[450px]">
+          <CardHeader>
+            <CardTitle>Join Workspace</CardTitle>
+            <CardDescription>
+              Enter the code to join a workspace.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form>
+              <div className="flex flex-col space-y-1.5">
+                <Label htmlFor="workspaceCode">Workspace Code</Label>
+                <Input
+                  id="workspaceCode"
+                  placeholder="Enter workspace code"
+                  value={workspaceCode}
+                  onChange={(e) => setWorkspaceCode(e.target.value)}
+                />
+              </div>
+            </form>
+          </CardContent>
+          <CardFooter>
+            <Button onClick={handleJoinWorkspace}>Join</Button>
           </CardFooter>
         </Card>
       </Modal>

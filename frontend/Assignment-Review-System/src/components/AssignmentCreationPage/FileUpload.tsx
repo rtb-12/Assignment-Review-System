@@ -1,9 +1,12 @@
 "use client";
-import React, { useState } from "react";
-import { FileUpload } from "@/components/ui/file-upload";
+import React from "react";
+import { FileUpload } from "../../components/ui/file-upload";
 
-export function FileUploadCreation() {
-  const [files, setFiles] = useState<File[]>([]);
+export function FileUploadCreation({
+  setFiles,
+}: {
+  setFiles: (files: File[]) => void;
+}) {
   const handleFileUpload = (files: File[]) => {
     setFiles(files);
     console.log(files);
