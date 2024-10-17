@@ -98,6 +98,8 @@ class WorkspaceMembers(models.Model):
 
 
 class GroupDetails(models.Model):
+    workspace_id = models.ForeignKey(
+        'WorkspaceDetail', on_delete=models.CASCADE, db_column='workspace_id', default=1)
     groupID = models.AutoField(primary_key=True)
     GroupName = models.CharField(max_length=255)
     description = models.TextField()
@@ -133,22 +135,22 @@ class GroupMembers(models.Model):
 
 
 class AssignmentDetails(models.Model):
-    workspace_id = models.ForeignKey(
-        WorkspaceDetail, on_delete=models.CASCADE, db_column='workspace_id')
     assignment_id = models.AutoField(primary_key=True)
     assignor = models.ForeignKey(
-        UserDetails, on_delete=models.CASCADE, db_column='Assignor_ID')
+        'UserDetails', on_delete=models.CASCADE, db_column='Assignor_ID')
     assignment_name = models.TextField(default='Assignment')
     assignment_description = models.TextField()
     deadline = models.DateTimeField()
     subtask_details = models.JSONField(default=list)
     attachments = models.JSONField(default=list)
+    workspace_id = models.ForeignKey(
+        'WorkspaceDetail', on_delete=models.CASCADE, db_column='workspace_id', default=1)
 
     class Meta:
         db_table = 'AssignmentDetails'
         indexes = [
-            models.Index(fields=['workspace_id', 'assignment_id', 'assignor', 'assignment_name', 'assignment_description',
-                         'deadline', 'subtask_details'], name='assignment_details_idx'),
+            models.Index(fields=['workspace_id', 'assignment_id',
+                         'assignor', 'assignment_name', 'assignment_description']),
         ]
 
     def __str__(self):

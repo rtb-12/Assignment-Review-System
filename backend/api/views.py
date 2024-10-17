@@ -45,6 +45,7 @@ class OAuth2Handler:
         request.session['oauth_state'] = state
         request.session.save()
         authorization_url = f"{self.authorization_url}?client_id={self.client_id}&redirect_uri={self.redirect_uri}&state={state}"
+        print("authorization_url", authorization_url)
         return redirect(authorization_url)
 
     def oauth_callback(self, request):
@@ -52,13 +53,14 @@ class OAuth2Handler:
         state = request.GET.get('state')
         stored_state = request.session.get('oauth_state')
 
-        # if state != stored_state:
-        #     return JsonResponse({'error': 'State mismatch'}, status=400)
+    # # Check for state mismatch
+    # if state != stored_state:
+    #     return JsonResponse({'error': 'State mismatch'}, status=400)
 
-        # Remove the state from the session after the check
-        request.session.pop('oauth_state', None)
+    # # Remove the state from the session after the check
+    # request.session.pop('oauth_state', None)
 
-        # Exchange the authorization code for an access token
+    # Exchange the authorization code for an access token
         data = {
             'grant_type': 'authorization_code',
             'code': code,
@@ -97,26 +99,14 @@ class OAuth2Handler:
                 'access': str(refresh.access_token),
             }
 
-            response = JsonResponse({
+            return JsonResponse({
                 'user_id': user.user_id,
                 'name': user.name,
                 'email': user.email,
-                'profile_image': urllib.parse.unquote(user.profile_image.url) if user.profile_image else None,
+                'profile_image':  urllib.parse.unquote(user.profile_image.url).replace('/media/', '', 1) if user.profile_image else None,
                 'refresh': tokens['refresh'],
                 'access': tokens['access'],
             })
-
-            # Set cookies
-            response.set_cookie('csrftoken', get_token(
-                request), secure=False, httponly=False, samesite='None')
-            response.set_cookie(
-                'access', tokens['access'], secure=False, httponly=False, samesite='None')
-            response.set_cookie(
-                'refresh', tokens['refresh'], secure=False, httponly=False, samesite='None')
-
-            # Redirect to frontend
-            frontend_url = "http://localhost:5173/workspace"
-            return redirect(frontend_url)
 
         else:
             return JsonResponse({'error': 'Failed to obtain access token'}, status=400)
@@ -165,12 +155,24 @@ class UserDetailsView(generics.GenericAPIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
 
+    def clean_profile_pic_url(self, url: str) -> str:
+        if url.startswith("/media/"):
+            url = url[len("/media/"):]
+
+        url = urllib.parse.unquote(url)
+
+        return url
+
     def get(self, request):
         user = request.user
+        profile_pic_url = user.profile_image.url if user.profile_image else None
+        cleaned_profile_pic_url = self.clean_profile_pic_url(
+            profile_pic_url) if profile_pic_url else None
+
         user_details = {
             "user_id": user.user_id,
             "username": user.name,
-            "profile_pic": user.profile_image.url if user.profile_image else None,
+            "profile_pic": cleaned_profile_pic_url,
         }
         return Response(user_details, status=status.HTTP_200_OK)
 
@@ -354,13 +356,47 @@ class AddGroupMemberView(generics.CreateAPIView):
 
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        serializer.save()
+        serializer.save(groupID=group)
 
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
 
 
-class CreateAssignmentView(generics.CreateAPIView):
+class RemoveGroupMemberView(generics.DestroyAPIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+
+    def delete(self, request, group_id):
+        user = request.user
+        user_id = request.data.get('user_id')
+        if not user_id:
+            return Response({"detail": "User ID is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            group = GroupDetails.objects.get(groupID=group_id)
+        except GroupDetails.DoesNotExist:
+            return Response({"detail": "Group not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        workspace = group.workspace_id
+
+        if not WorkspaceMembers.objects.filter(workspace_id=workspace, user_id=user, workspace_role='2').exists():
+            return Response({"detail": "You do not have permission to remove members from this group."}, status=status.HTTP_403_FORBIDDEN)
+
+        try:
+            member_to_remove = UserDetails.objects.get(userID=user_id)
+        except UserDetails.DoesNotExist:
+            return Response({"detail": "User not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            group_member = GroupMembers.objects.get(
+                groupID=group, userID=member_to_remove)
+            group_member.delete()
+            return Response({"detail": "Member removed from group successfully."}, status=status.HTTP_204_NO_CONTENT)
+        except GroupMembers.DoesNotExist:
+            return Response({"detail": "Member not found in this group."}, status=status.HTTP_404_NOT_FOUND)
+
+
+class CreateAssignmentWithMembersView(generics.CreateAPIView):
     serializer_class = AssignmentCreateSerializer
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
@@ -372,6 +408,9 @@ class CreateAssignmentView(generics.CreateAPIView):
 
     def create(self, request, workspace_id):
         user = request.user
+        data = request.data
+
+        # Create the assignment
         try:
             workspace = WorkspaceDetail.objects.get(workspace_id=workspace_id)
         except WorkspaceDetail.DoesNotExist:
@@ -380,7 +419,49 @@ class CreateAssignmentView(generics.CreateAPIView):
         if not WorkspaceMembers.objects.filter(workspace_id=workspace, user_id=user).exists():
             return Response({"detail": "You are not a member of this workspace."}, status=status.HTTP_403_FORBIDDEN)
 
-        return super().create(request)
+        assignment_serializer = self.get_serializer(data=data)
+        assignment_serializer.is_valid(raise_exception=True)
+        assignment = assignment_serializer.save(
+            assignor=user, workspace_id=workspace)
+
+        # Add individual members to the assignment
+        individual_members = data.get('individual_members', [])
+        for member in individual_members:
+            user_id = member.get('user_id')
+            role = member.get('role')
+            try:
+                user_to_add = UserDetails.objects.get(user_id=user_id)
+            except UserDetails.DoesNotExist:
+                return Response({"detail": f"User with ID {user_id} not found."}, status=status.HTTP_404_NOT_FOUND)
+
+            assignment_role = AssignmentRoles(
+                assignment=assignment, user=user_to_add, role_id=role)
+            assignment_role.save()
+
+        # Add group members to the assignment
+        group_ids = data.get('group_ids', [])
+        for group_id in group_ids:
+            try:
+                group = GroupDetails.objects.get(groupID=group_id)
+            except GroupDetails.DoesNotExist:
+                return Response({"detail": f"Group with ID {group_id} not found."}, status=status.HTTP_404_NOT_FOUND)
+
+            group_members = GroupMembers.objects.filter(groupID=group)
+            if not group_members.exists():
+                return Response({"detail": f"No members found in group with ID {group_id}."}, status=status.HTTP_404_NOT_FOUND)
+
+            assignment_roles = []
+            for member in group_members:
+                assignment_role = AssignmentRoles(
+                    assignment=assignment,
+                    user=member.userID,
+                    role_id=member.roleID
+                )
+                assignment_roles.append(assignment_role)
+
+            AssignmentRoles.objects.bulk_create(assignment_roles)
+
+        return Response(assignment_serializer.data, status=status.HTTP_201_CREATED)
 
 
 class ManageAssignmentRolesView(generics.CreateAPIView):
@@ -552,94 +633,22 @@ class AssignmentStatusDetailView(generics.RetrieveAPIView):
         return Response(serializer.data)
 
 
-class ViewAssignmentDetailsView(generics.RetrieveAPIView):
-    serializer_class = AssignmentDetailsSerializer
-    permission_classes = [IsAuthenticated]
-    authentication_classes = [JWTAuthentication]
-    lookup_field = 'assignment_id'
-    queryset = AssignmentDetails.objects.all()
+# class ViewAssignmentDetailsView(generics.RetrieveAPIView):
+#     serializer_class = AssignmentDetailsSerializer
+#     permission_classes = [IsAuthenticated]
+#     authentication_classes = [JWTAuthentication]
+#     lookup_field = 'assignment_id'
+#     queryset = AssignmentDetails.objects.all()
 
-    def get(self, request, assignment_id):
-        try:
-            assignment = AssignmentDetails.objects.get(
-                assignment_id=assignment_id)
-        except AssignmentDetails.DoesNotExist:
-            return Response({"detail": "Assignment not found."}, status=status.HTTP_404_NOT_FOUND)
+#     def get(self, request, assignment_id):
+#         try:
+#             assignment = AssignmentDetails.objects.get(
+#                 assignment_id=assignment_id)
+#         except AssignmentDetails.DoesNotExist:
+#             return Response({"detail": "Assignment not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        serializer = self.get_serializer(assignment)
-        return Response(serializer.data)
-
-
-class AddMembersToAssignmentView(generics.CreateAPIView):
-    serializer_class = AssignmentRoleSerializer
-    permission_classes = [IsAuthenticated]
-    authentication_classes = [JWTAuthentication]
-
-    def create(self, request, *args, **kwargs):
-        user = request.user
-        user_id = request.data.get('userID')
-        assignment_id = request.data.get('assignment_id')
-        role = request.data.get('role')
-
-        try:
-            assignment = AssignmentDetails.objects.get(
-                assignment_id=assignment_id)
-        except AssignmentDetails.DoesNotExist:
-            return Response({"detail": "Assignment not found."}, status=status.HTTP_404_NOT_FOUND)
-
-        # if not AssignmentRoles.objects.filter(assignment=assignment, user=user, role_id='2').exists():
-        #     return Response({"detail": "You do not have permission to manage roles for this assignment."}, status=status.HTTP_403_FORBIDDEN)
-
-        try:
-            user_to_add = UserDetails.objects.get(user_id=user_id)
-        except UserDetails.DoesNotExist:
-            return Response({"detail": "User not found."}, status=status.HTTP_404_NOT_FOUND)
-
-        assignment_role = AssignmentRoles(
-            assignment=assignment, user=user_to_add, role_id=role)
-        assignment_role.save()
-
-        serializer = self.get_serializer(assignment_role)
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
-
-
-class AddGroupToAssignment(generics.CreateAPIView):
-    permission_classes = [IsAuthenticated]
-    authentication_classes = [JWTAuthentication]
-
-    def create(self, request, *args, **kwargs):
-        group_id = request.data.get('groupID')
-        role_id = request.data.get('roleID')
-        assignment_id = request.data.get('assignmentID')
-
-        try:
-            assignment = AssignmentDetails.objects.get(
-                assignment_id=assignment_id)
-        except AssignmentDetails.DoesNotExist:
-            return Response({"detail": "Assignment not found."}, status=status.HTTP_404_NOT_FOUND)
-
-        try:
-            group = GroupDetails.objects.get(groupID=group_id)
-        except GroupDetails.DoesNotExist:
-            return Response({"detail": "Group not found."}, status=status.HTTP_404_NOT_FOUND)
-
-        group_members = GroupMembers.objects.filter(groupID=group)
-
-        if not group_members.exists():
-            return Response({"detail": "No members found in the group."}, status=status.HTTP_404_NOT_FOUND)
-
-        assignment_roles = []
-        for member in group_members:
-            assignment_role = AssignmentRoles(
-                assignment=assignment,
-                user=member.userID,
-                role_id=role_id
-            )
-            assignment_roles.append(assignment_role)
-
-        AssignmentRoles.objects.bulk_create(assignment_roles)
-
-        return Response({"detail": "Group members added to assignment roles successfully."}, status=status.HTTP_201_CREATED)
+#         serializer = self.get_serializer(assignment)
+#         return Response(serializer.data)
 
 
 class ListGroupsInWorkspaceView(generics.ListAPIView):
@@ -849,3 +858,41 @@ class UpdateSubtaskFeedbackView(generics.UpdateAPIView):
         serializer.save()
 
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class ListMembersInWorkspaceView(generics.ListAPIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+    serializer_class = UserProfileSerializer
+
+    def get_queryset(self):
+        workspace_id = self.kwargs['workspace_id']
+        user_ids = WorkspaceMembers.objects.filter(
+            workspace_id=workspace_id).values_list('user_id', flat=True)
+        return UserDetails.objects.filter(user_id__in=user_ids)
+
+
+class ListGroupsInWorkspaceView(generics.ListAPIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+    serializer_class = GroupSerializer
+
+    def get_queryset(self):
+        workspace_id = self.kwargs['workspace_id']
+        user = self.request.user
+
+        try:
+            workspace = WorkspaceDetail.objects.get(workspace_id=workspace_id)
+        except WorkspaceDetail.DoesNotExist:
+            return Response({"detail": "Workspace not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            membership = WorkspaceMembers.objects.get(
+                workspace_id=workspace, user_id=user)
+        except WorkspaceMembers.DoesNotExist:
+            return Response({"detail": "You are not a member of this workspace."}, status=status.HTTP_403_FORBIDDEN)
+
+        if membership.workspace_role != '2':
+            return Response({"detail": "You do not have permission to view groups in this workspace."}, status=status.HTTP_403_FORBIDDEN)
+
+        return GroupDetails.objects.filter(workspace_id=workspace_id)
