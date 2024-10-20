@@ -17,6 +17,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { RootState } from "../../store/store";
 import { useParams } from "react-router-dom";
 import { setWorkspaceId } from "../../features/workspace/workspaceSlice";
+import { Tangent } from "lucide-react";
 
 const Textarea = ({ value, onChange, className, ...props }) => (
   <textarea
@@ -28,15 +29,14 @@ const Textarea = ({ value, onChange, className, ...props }) => (
 );
 
 const AssignmentCreationPage = () => {
-  const [assignmentName, setAssignmentName] = useState("");
-  const [assignmentDescription, setAssignmentDescription] = useState("");
-  const [files, setFiles] = useState<File[]>([]);
-  const [subtasks, setSubtasks] = useState([{ description: "", points: "" }]);
+  const [selectedMembers, setSelectedMembers] = useState([]);
   const [members, setMembers] = useState([]);
   const [groups, setGroups] = useState([]);
-  const [selectedMembers, setSelectedMembers] = useState([]);
-  const [selectedGroups, setSelectedGroups] = useState([]);
-  const [deadline, setDeadline] = useState<Date | null>(null);
+  const [assignmentName, setAssignmentName] = useState("");
+  const [assignmentDescription, setAssignmentDescription] = useState("");
+  const [files, setFiles] = useState([]);
+  const [subtasks, setSubtasks] = useState([{ description: "", points: "" }]);
+  const [deadline, setDeadline] = useState(null);
 
   const dispatch = useDispatch();
   const { workspaceId: paramWorkspaceId } = useParams<{
@@ -51,7 +51,6 @@ const AssignmentCreationPage = () => {
     if (!workspaceId && paramWorkspaceId) {
       dispatch(setWorkspaceId(paramWorkspaceId));
       workspaceId = paramWorkspaceId;
-      // console.log("workspaceId(in Assignment Creation Page): " + workspaceId);
 
       const fetchMembersAndGroups = async () => {
         try {
@@ -95,6 +94,17 @@ const AssignmentCreationPage = () => {
     setSubtasks([...subtasks, { description: "", points: "" }]);
   };
 
+  const handleMemberSelect = (member) => {
+    console.log("Selected member:", member);
+    setSelectedMembers((prevMembers) => [...prevMembers, member]);
+  };
+
+  const handleMemberRemove = (member) => {
+    setSelectedMembers((prevMembers) =>
+      prevMembers.filter((prevMember) => prevMember.user_id !== member.user_id)
+    );
+  };
+
   const handleSubmit = async () => {
     const payload = {
       assignment_name: assignmentName,
@@ -102,27 +112,12 @@ const AssignmentCreationPage = () => {
       deadline: deadline ? deadline.toISOString() : null,
       subtask_details: subtasks,
       attachments: files,
-      individual_members: selectedMembers,
-      group_ids: selectedGroups,
+      individual_members: selectedMembers.map((member) => member.user_id), // Send member usernames
+      // group_ids: selectedGroups,
     };
     console.log(payload);
-    // try {
-    //   const response = await fetch(
-    //     "http://localhost:8000/api/assignments/create/",
-    //     {
-    //       method: "POST",
-    //       headers: {
-    //         Authorization: `Bearer ${Cookies.get("access")}`,
-    //       },
-    //       body: formData,
-    //     }
-    //   );
-    //   // Handle response
-    //   const result = await response.json();
-    //   console.log(result);
-    // } catch (error) {
-    //   console.error("Error submitting assignment:", error);
-    // }
+    // console.log(selectedMembers);
+    // Submit the form...
   };
 
   return (
@@ -137,6 +132,8 @@ const AssignmentCreationPage = () => {
             Create Assignment
           </Button>
         </div>
+
+        {/* Assignment Name and Description */}
         <div className="mb-4">
           <label className="block text-gray-700">Name of Assignment</label>
           <Input
@@ -154,9 +151,13 @@ const AssignmentCreationPage = () => {
             className="w-full p-2 border border-gray-300 rounded mt-1"
           />
         </div>
+
+        {/* File Upload */}
         <div className="mb-4">
           <FileUploadCreation setFiles={setFiles} />
         </div>
+
+        {/* Subtasks */}
         <h2 className="text-xl font-bold mb-2">Create Subtask</h2>
         {subtasks.map((subtask, index) => (
           <div key={index} className="mb-4">
@@ -188,31 +189,22 @@ const AssignmentCreationPage = () => {
         </Button>
       </div>
 
+      {/* Sidebar: Members and Deadline */}
       <div className="w-1/4">
         <h2 className="text-lg font-bold">Overall Deadline</h2>
         <DatePickerWithPresets setDate={setDeadline} />
-        <h2 className="text-lg font-bold mt-4">Assign Reviewers</h2>
+
+        {/* Assign Members */}
+        <h2 className="text-lg font-bold mt-4">Assign Members</h2>
         <ComboboxDemo
           options={members}
           selectedOptions={selectedMembers}
-          setSelectedOptions={setSelectedMembers}
+          handleMemberSelect={handleMemberSelect}
+          handleMemberRemove={handleMemberRemove}
         />
 
-        <h2 className="text-lg font-bold mt-4">Assign Students</h2>
-        <ComboboxDemo
-          options={members}
-          selectedOptions={selectedMembers}
-          setSelectedOptions={setSelectedMembers}
-        />
-
-        <h2 className="text-lg font-bold mt-4">Assign Group</h2>
-        <ComboboxDemo
-          options={groups}
-          selectedOptions={selectedGroups}
-          setSelectedOptions={setSelectedGroups}
-        />
-
-        <h2 className="text-lg font-bold mt-4">Assigned Candidates</h2>
+        {/* Selected Members Table */}
+        <h2 className="text-lg font-bold mt-4">Assigned Members</h2>
         <div className="overflow-y-scroll h-[17rem] mt-2 border border-gray-300 rounded">
           <Table>
             <TableHeader>
@@ -220,16 +212,40 @@ const AssignmentCreationPage = () => {
                 <TableHead>S.No</TableHead>
                 <TableHead>Avatar</TableHead>
                 <TableHead>Name</TableHead>
+                <TableHead>Action</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {/* {candidates.map((candidate) => (
-                <TableRow key={candidate.sno}>
-                  <TableCell>{candidate.sno}</TableCell>
-                  <TableCell>{candidate.avatar}</TableCell>
-                  <TableCell>{candidate.name}</TableCell>
+              {selectedMembers.map((member, index) => (
+                <TableRow key={member.user_id}>
+                  <TableCell>{index + 1}</TableCell>
+                  <TableCell>
+                    <img
+                      src={
+                        member.profile_image
+                          ? decodeURIComponent(
+                              member.profile_image.replace(
+                                "http://localhost:8000/media/",
+                                ""
+                              )
+                            )
+                          : "https://via.placeholder.com/150"
+                      }
+                      alt={member.name}
+                      className="w-8 h-8 rounded-full"
+                    />
+                  </TableCell>
+                  <TableCell>{member.name}</TableCell>
+                  <TableCell>
+                    <Button
+                      className="bg-red-500 text-white"
+                      onClick={() => handleMemberRemove(member)}
+                    >
+                      Delete
+                    </Button>
+                  </TableCell>
                 </TableRow>
-              ))} */}
+              ))}
             </TableBody>
           </Table>
         </div>
