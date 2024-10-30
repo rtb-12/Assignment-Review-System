@@ -20,8 +20,17 @@ import {
   SelectValue,
 } from "../../components/ui/select";
 
-export function DatePickerWithPresets() {
-  const [date, setDate] = React.useState<Date>();
+interface DatePickerProps {
+  setDate: (date: Date) => void;
+}
+
+export function DatePickerWithPresets({ setDate }: DatePickerProps) {
+  const [date, setDateState] = React.useState<Date>();
+
+  const handleDateChange = (newDate: Date) => {
+    setDateState(newDate);
+    setDate(newDate);
+  };
 
   return (
     <Popover>
@@ -43,7 +52,7 @@ export function DatePickerWithPresets() {
       >
         <Select
           onValueChange={(value) =>
-            setDate(addDays(new Date(), parseInt(value)))
+            handleDateChange(addDays(new Date(), parseInt(value)))
           }
         >
           <SelectTrigger>
@@ -57,7 +66,7 @@ export function DatePickerWithPresets() {
           </SelectContent>
         </Select>
         <div className="rounded-md border">
-          <Calendar mode="single" selected={date} onSelect={setDate} />
+          <Calendar mode="single" selected={date} onSelect={handleDateChange} />
         </div>
       </PopoverContent>
     </Popover>

@@ -1,5 +1,6 @@
 # api/views.py
 from datetime import timezone
+import json
 from django.middleware.csrf import get_token
 from rest_framework import status
 from rest_framework.response import Response
@@ -396,21 +397,15 @@ class RemoveGroupMemberView(generics.DestroyAPIView):
             return Response({"detail": "Member not found in this group."}, status=status.HTTP_404_NOT_FOUND)
 
 
-class CreateAssignmentWithMembersView(generics.CreateAPIView):
+class CreateAssignment(generics.CreateAPIView):
     serializer_class = AssignmentCreateSerializer
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
-
-    def get_serializer_context(self):
-        context = super().get_serializer_context()
-        context['workspace_id'] = self.kwargs['workspace_id']
-        return context
 
     def create(self, request, workspace_id):
         user = request.user
         data = request.data
 
-        # Create the assignment
         try:
             workspace = WorkspaceDetail.objects.get(workspace_id=workspace_id)
         except WorkspaceDetail.DoesNotExist:
@@ -419,47 +414,14 @@ class CreateAssignmentWithMembersView(generics.CreateAPIView):
         if not WorkspaceMembers.objects.filter(workspace_id=workspace, user_id=user).exists():
             return Response({"detail": "You are not a member of this workspace."}, status=status.HTTP_403_FORBIDDEN)
 
-        assignment_serializer = self.get_serializer(data=data)
-        assignment_serializer.is_valid(raise_exception=True)
-        assignment = assignment_serializer.save(
-            assignor=user, workspace_id=workspace)
+        individual_members = request.data.getlist('individual_members')
 
-        # Add individual members to the assignment
-        individual_members = data.get('individual_members', [])
-        for member in individual_members:
-            user_id = member.get('user_id')
-            role = member.get('role')
-            try:
-                user_to_add = UserDetails.objects.get(user_id=user_id)
-            except UserDetails.DoesNotExist:
-                return Response({"detail": f"User with ID {user_id} not found."}, status=status.HTTP_404_NOT_FOUND)
+        assignment_serializer = self.get_serializer(data=data, context={
+                                                    'workspace_id': workspace_id, 'request': request, 'individual_members': individual_members})
+        if not assignment_serializer.is_valid():
+            return Response(assignment_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-            assignment_role = AssignmentRoles(
-                assignment=assignment, user=user_to_add, role_id=role)
-            assignment_role.save()
-
-        # Add group members to the assignment
-        group_ids = data.get('group_ids', [])
-        for group_id in group_ids:
-            try:
-                group = GroupDetails.objects.get(groupID=group_id)
-            except GroupDetails.DoesNotExist:
-                return Response({"detail": f"Group with ID {group_id} not found."}, status=status.HTTP_404_NOT_FOUND)
-
-            group_members = GroupMembers.objects.filter(groupID=group)
-            if not group_members.exists():
-                return Response({"detail": f"No members found in group with ID {group_id}."}, status=status.HTTP_404_NOT_FOUND)
-
-            assignment_roles = []
-            for member in group_members:
-                assignment_role = AssignmentRoles(
-                    assignment=assignment,
-                    user=member.userID,
-                    role_id=member.roleID
-                )
-                assignment_roles.append(assignment_role)
-
-            AssignmentRoles.objects.bulk_create(assignment_roles)
+        assignment_serializer.save()
 
         return Response(assignment_serializer.data, status=status.HTTP_201_CREATED)
 
@@ -542,10 +504,17 @@ class OngoingAssignmentsView(generics.ListAPIView):
         user = self.request.user
         now = timezone.now()
 
+        # Check if the user is assigned any assignments with role value 1
+        assigned_assignments = AssignmentRoles.objects.filter(
+            user=user, role_id=1).values_list('assignment', flat=True)
+        if not assigned_assignments.exists():
+            return AssignmentStatus.objects.none()
+
         # Filter assignments where the deadline is not crossed
         ongoing_assignments = AssignmentStatus.objects.filter(
             user=user,
-            assignment__deadline__gt=now
+            assignment__deadline__gt=now,
+            assignment__in=assigned_assignments
         ).select_related('assignment')
 
         # Filter assignments where not all subtasks are completed
@@ -560,6 +529,16 @@ class OngoingAssignmentsView(generics.ListAPIView):
                 filtered_assignments.append(assignment_status)
 
         return filtered_assignments
+
+    def list(self, request, *args, **kwargs):
+        user = self.request.user
+
+        # Check if the user is assigned any assignments with role value 1
+        assigned_assignments = AssignmentRoles.objects.filter(
+            user=user, role_id=1).exists()
+
+        # Return whether the user is assigned the assignment or not
+        return Response({'assigned': assigned_assignments}, status=status.HTTP_200_OK)
 
 
 class CompletedAssignmentsView(generics.ListAPIView):

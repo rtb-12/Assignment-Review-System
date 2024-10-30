@@ -5,6 +5,7 @@ import { Input } from "../../components/ui/input";
 import { Button } from "../../components/ui/button";
 import { FileUploadCreation } from "./FileUpload";
 import Cookies from "js-cookie";
+import axios from "axios";
 import {
   Table,
   TableBody,
@@ -17,9 +18,20 @@ import { useDispatch, useSelector } from "react-redux";
 import { RootState } from "../../store/store";
 import { useParams } from "react-router-dom";
 import { setWorkspaceId } from "../../features/workspace/workspaceSlice";
-import { Tangent } from "lucide-react";
 
-const Textarea = ({ value, onChange, className, ...props }) => (
+interface TextareaProps {
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
+  className?: string;
+  [key: string]: string | number | boolean | undefined;
+}
+
+const Textarea: React.FC<TextareaProps> = ({
+  value,
+  onChange,
+  className,
+  ...props
+}) => (
   <textarea
     value={value}
     onChange={onChange}
@@ -29,14 +41,25 @@ const Textarea = ({ value, onChange, className, ...props }) => (
 );
 
 const AssignmentCreationPage = () => {
-  const [selectedMembers, setSelectedMembers] = useState([]);
-  const [members, setMembers] = useState([]);
-  const [groups, setGroups] = useState([]);
+  interface Member {
+    user_id: string;
+    profile_image: string;
+    name: string;
+  }
+  const generateUniqueId = () => {
+    return `${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+  };
+
+  const [selectedMembers, setSelectedMembers] = useState<Member[]>([]);
+  const [members, setMembers] = useState<Member[]>([]);
+  // const [groups, setGroups] = useState([]);
   const [assignmentName, setAssignmentName] = useState("");
   const [assignmentDescription, setAssignmentDescription] = useState("");
-  const [files, setFiles] = useState([]);
-  const [subtasks, setSubtasks] = useState([{ description: "", points: "" }]);
-  const [deadline, setDeadline] = useState(null);
+  const [files, setFiles] = useState<File[]>([]);
+  const [subtasks, setSubtasks] = useState([
+    { subtask_id: generateUniqueId(), description: "", points: "" },
+  ]);
+  const [deadline, setDeadline] = useState<Date | null>(null);
 
   const dispatch = useDispatch();
   const { workspaceId: paramWorkspaceId } = useParams<{
@@ -84,14 +107,17 @@ const AssignmentCreationPage = () => {
     }
   }, [workspaceId, paramWorkspaceId, dispatch]);
 
-  const handleSubtaskChange = (index: number, field: string, value: string) => {
+  const handleSubtaskChange = (index, field, value) => {
     const newSubtasks = [...subtasks];
     newSubtasks[index][field] = value;
     setSubtasks(newSubtasks);
   };
 
   const addSubtask = () => {
-    setSubtasks([...subtasks, { description: "", points: "" }]);
+    setSubtasks([
+      ...subtasks,
+      { subtask_id: generateUniqueId(), description: "", points: "" },
+    ]);
   };
 
   const handleMemberSelect = (member) => {
@@ -106,18 +132,52 @@ const AssignmentCreationPage = () => {
   };
 
   const handleSubmit = async () => {
-    const payload = {
-      assignment_name: assignmentName,
-      assignment_description: assignmentDescription,
-      deadline: deadline ? deadline.toISOString() : null,
-      subtask_details: subtasks,
-      attachments: files,
-      individual_members: selectedMembers.map((member) => member.user_id), // Send member usernames
-      // group_ids: selectedGroups,
-    };
-    console.log(payload);
-    // console.log(selectedMembers);
-    // Submit the form...
+    const subtaskDetails = subtasks.map((subtask) => ({
+      subtask_id: subtask.subtask_id,
+      description: subtask.description,
+      points: subtask.points,
+    }));
+
+    const formData = new FormData();
+    formData.append("assignment_name", assignmentName);
+    formData.append("assignment_description", assignmentDescription);
+    formData.append("deadline", deadline ? deadline.toISOString() : null);
+    formData.append("subtask_details", JSON.stringify(subtaskDetails));
+
+    selectedMembers.forEach((member) => {
+      formData.append("individual_members", member.user_id);
+    });
+
+    files.forEach((file) => {
+      formData.append("attachments", file);
+    });
+
+    console.log(formData);
+
+    for (const pair of formData.entries()) {
+      console.log(`${pair[0]}: ${pair[1]}`);
+    }
+
+    try {
+      const response = await axios.post(
+        `http://localhost:8000/api/workspace/${workspaceId}/create-assignment`,
+        formData,
+        {
+          headers: {
+            Authorization: `Bearer ${Cookies.get("access")}`,
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
+
+      if (response.status === 201) {
+        console.log("Assignment created successfully!");
+      } else {
+        console.log("Error creating assignment!");
+      }
+    } catch (error) {
+      console.log(error);
+    }
   };
 
   return (
@@ -147,7 +207,9 @@ const AssignmentCreationPage = () => {
           <label className="block text-gray-700">Description</label>
           <Textarea
             value={assignmentDescription}
-            onChange={(e) => setAssignmentDescription(e.target.value)}
+            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
+              setAssignmentDescription(e.target.value)
+            }
             className="w-full p-2 border border-gray-300 rounded mt-1"
           />
         </div>
@@ -160,7 +222,7 @@ const AssignmentCreationPage = () => {
         {/* Subtasks */}
         <h2 className="text-xl font-bold mb-2">Create Subtask</h2>
         {subtasks.map((subtask, index) => (
-          <div key={index} className="mb-4">
+          <div key={subtask.subtask_id} className="mb-4">
             <label className="block text-gray-700">Subtask Description</label>
             <Input
               type="text"
