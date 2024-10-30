@@ -1,3 +1,6 @@
+from .models import AssignmentDetails
+import json
+import uuid
 import os
 from django.conf import settings  # type: ignore
 from django.core.files.storage import default_storage  # type: ignore
@@ -151,24 +154,64 @@ class AssignmentCreateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = AssignmentDetails
-        fields = ['assignment_description', 'deadline',
-                  'subtask_details', 'attachments']
+        fields = [
+            "assignment_name",
+            "assignment_description",
+            "deadline",
+            "subtask_details",
+            "attachments"
+        ]
 
     def create(self, validated_data):
         user = self.context['request'].user
         assignor = UserDetails.objects.get(user_id=user.user_id)
+        workspace_id = self.context['workspace_id']
+        workspace = WorkspaceDetail.objects.get(workspace_id=workspace_id)
         attachments = validated_data.pop('attachments', [])
+        subtask_details = validated_data.get('subtask_details', [])
+        individual_members = self.context['individual_members']
         assignment = AssignmentDetails.objects.create(
-            assignor=assignor, **validated_data)
+            assignor=assignor, workspace_id=workspace, **validated_data)
 
         for attachment in attachments:
             file_path = self.save_attachment(attachment)
             assignment.attachments.append(file_path)
 
+        assignment.subtask_details = subtask_details
         assignment.save()
 
-        AssignmentRoles.objects.create(
+        assignor_role = AssignmentRoles.objects.create(
             assignment=assignment, user=assignor, role_id='2')
+
+        for member_id in individual_members:
+            try:
+                user_to_add = UserDetails.objects.get(user_id=member_id)
+                AssignmentRoles.objects.create(
+                    assignment=assignment, user=user_to_add, role_id='1')
+            except UserDetails.DoesNotExist:
+                raise serializers.ValidationError(
+                    f"User with ID {member_id} not found.")
+
+        # Populate AssignmentStatus for each assigned member and each subtask
+        for member_id in individual_members:
+            try:
+                member = UserDetails.objects.get(user_id=member_id)
+                for subtask in subtask_details:
+                    AssignmentStatus.objects.create(
+                        user=member,
+                        assignment=assignment,
+                        task_id=subtask['subtask_id'],
+                        status='not_started',
+                        reviewer=assignor_role,  # Assign the assignor's role as the reviewer
+                        submission_id='',
+                        submission_link='',
+                        submission_doc='',
+                        points_assign=0,
+                        feedback_details=[],
+                        submission_attachments=[]
+                    )
+            except UserDetails.DoesNotExist:
+                continue  # Skip if the user does not exist
 
         return assignment
 

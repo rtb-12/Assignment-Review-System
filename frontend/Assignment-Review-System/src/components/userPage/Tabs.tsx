@@ -100,9 +100,10 @@ export function TabsUser() {
           <p className="pb-4">Ongoing Assignments</p>
           <div className="flex flex-row gap-4 overflow-x-auto flex-nowrap">
             {/* Render AssignmentCard components dynamically */}
-            {ongoingAssignments.map((assignment) => (
-              <AssignmentCard key={assignment.id} assignment={assignment} />
-            ))}
+            {Array.isArray(ongoingAssignments) &&
+              ongoingAssignments.map((assignment) => (
+                <AssignmentCard key={assignment.id} assignment={assignment} />
+              ))}
           </div>
         </div>
       ),
