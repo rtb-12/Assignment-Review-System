@@ -1,37 +1,161 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import SubmissionViewModal from "./SubmissionViewModal";
 import GlobalChatAssignment from "../GlobalChatAssignment/ChatBox";
+import axios from "axios";
+import Cookies from "js-cookie";
+import { useParams } from "react-router-dom";
 
 const AssignmentReviewPage = () => {
+  const { workspaceId, assignmentId, revieweeId } = useParams<{
+    workspaceId: string;
+    assignmentId: string;
+    revieweeId: string;
+  }>();
+
   const [assignment, setAssignment] = useState({
-    name: "Machine Learning Project",
-    description:
-      "This assignment involves building a machine learning model to classify data points accurately.",
     isCompleted: false,
     fileUrl: "/path-to-file",
-    subtasks: [
-      { description: "Data Preprocessing", points: 10, completed: false },
-      { description: "Model Training", points: 20, completed: false },
-      { description: "Model Evaluation", points: 15, completed: true },
-    ],
+    subtasks: [],
   });
-
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [submissionData, setSubmissionData] = useState({
+    link: "",
+    doc: "",
+    files: [],
+  });
   const [newComment, setNewComment] = useState("");
-  const [comments, setComments] = useState([
-    { author: "Reviewer", message: "Good start! Keep going!" },
-  ]);
+  const [comments, setComments] = useState([]);
 
-  const handleAssignmentSubmission = () => {
-    setAssignment({ ...assignment, isCompleted: true });
-    alert("Assignment Submitted!");
+  useEffect(() => {
+    const fetchSubtasks = async () => {
+      try {
+        const response = await axios.get(
+          `http://localhost:8000/api/workspace/${workspaceId}/assignments/${assignmentId}/reviewees/${revieweeId}/subtasks/`,
+          {
+            headers: {
+              Authorization: `Bearer ${Cookies.get("access")}`,
+            },
+          }
+        );
+
+        if (response.status === 200) {
+          const data = response.data.map((subtask: any) => ({
+            subtask_id: subtask.subtask_id,
+            description: subtask.subtask_name,
+            points: subtask.subtask_max_points,
+            completed: subtask.status === "Completed",
+            pointsAssigned: subtask.points_assigned,
+          }));
+          setAssignment((prev) => ({ ...prev, subtasks: data }));
+        } else {
+          console.error("Failed to fetch subtask data");
+        }
+      } catch (error) {
+        console.error("Error fetching subtask data:", error);
+      }
+    };
+
+    const fetchComments = async () => {
+      try {
+        const response = await axios.get(
+          `http://localhost:8000/api/workspace/${workspaceId}/assignments/${assignmentId}/feedback/reviwee/${revieweeId}/`,
+          {
+            headers: {
+              Authorization: `Bearer ${Cookies.get("access")}`,
+            },
+          }
+        );
+
+        if (response.status === 200) {
+          setComments(response.data.feedback_details);
+        } else {
+          console.error("Failed to fetch comments");
+        }
+      } catch (error) {
+        console.error("Error fetching comments:", error);
+      }
+    };
+
+    fetchSubtasks();
+    fetchComments();
+  }, [workspaceId, assignmentId, revieweeId]);
+
+  const handleModalClose = () => {
+    setIsModalOpen(false);
   };
 
-  const handleCommentSubmit = () => {
+  const handleAssignmentSubmissionView = async () => {
+    try {
+      const response = await axios.get(
+        `http://localhost:8000/api/workspace/${workspaceId}/assignments/${assignmentId}/reviewees/${revieweeId}/submission/`,
+        {
+          headers: {
+            Authorization: `Bearer ${Cookies.get("access")}`,
+          },
+        }
+      );
+
+      if (response.status === 200) {
+        const data = response.data;
+        setSubmissionData({
+          link: data.submission_link,
+          doc: data.submission_doc,
+          files: data.submission_attachments,
+        });
+        setIsModalOpen(true);
+      } else {
+        console.error("Failed to fetch submission data");
+      }
+    } catch (error) {
+      console.error("Error fetching submission data:", error);
+    }
+  };
+
+  const handleCommentSubmit = async () => {
     if (newComment.trim()) {
-      setComments([...comments, { author: "You", message: newComment }]);
-      setNewComment("");
+      const newCommentData = {
+        isReviewer: true,
+        feedback: newComment,
+        time: new Date().toISOString(),
+      };
+
+      try {
+        const response = await axios.get(
+          `http://localhost:8000/api/workspace/${workspaceId}/assignments/${assignmentId}/feedback/reviwee/${revieweeId}/`,
+          {
+            headers: {
+              Authorization: `Bearer ${Cookies.get("access")}`,
+            },
+          }
+        );
+
+        if (response.status === 200) {
+          const updatedComments = [
+            ...response.data.feedback_details,
+            newCommentData,
+          ];
+
+          await axios.put(
+            `http://localhost:8000/api/workspace/${workspaceId}/assignments/${assignmentId}/reviewees/${revieweeId}/update-feedback/`,
+            { feedback_details: updatedComments },
+            {
+              headers: {
+                Authorization: `Bearer ${Cookies.get("access")}`,
+              },
+            }
+          );
+
+          setComments(updatedComments);
+          setNewComment("");
+        } else {
+          console.error("Failed to fetch original comments");
+        }
+      } catch (error) {
+        console.error("Error posting comment:", error);
+      }
     }
   };
 
@@ -44,32 +168,43 @@ const AssignmentReviewPage = () => {
 
   const handlePointsChange = (index: number, points: number) => {
     const updatedSubtasks = assignment.subtasks.map((subtask, i) =>
-      i === index ? { ...subtask, points } : subtask
+      i === index ? { ...subtask, pointsAssigned: points } : subtask
     );
     setAssignment({ ...assignment, subtasks: updatedSubtasks });
   };
 
-  const handleSubtaskUpdate = (index: number) => {
-    // Logic to update the subtask can be added here
-    alert(`Subtask ${index + 1} updated!`);
+  const handleUpdateSubtask = async (index: number) => {
+    const subtask = assignment.subtasks[index];
+    try {
+      const response = await axios.put(
+        `http://localhost:8000/api/workspace/${workspaceId}/assignments/${assignmentId}/reviewees/${revieweeId}/subtasks/${subtask.subtask_id}/update-status/`,
+        {
+          status: subtask.completed ? "Completed" : "Incomplete",
+          points_assign: subtask.pointsAssigned,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${Cookies.get("access")}`,
+          },
+        }
+      );
+
+      if (response.status === 200) {
+        alert("Subtask updated successfully!");
+      } else {
+        console.error("Failed to update subtask");
+      }
+    } catch (error) {
+      console.error("Error updating subtask:", error);
+    }
   };
 
   return (
     <div className="p-8 flex flex-col md:flex-row">
       <div className="md:w-3/4 pr-8">
-        <h1 className="text-5xl font-bold mb-4">{assignment.name}</h1>
-        <p className="mb-4">{assignment.description}</p>
-        <a
-          href={assignment.fileUrl}
-          download
-          className="bg-blue-500 text-white px-4 py-2 rounded mb-4 dark:bg-zinc-50 dark:text-zinc-900"
-        >
-          Download Assignment Files
-        </a>
-
         <div className="flex items-center justify-between m-4">
           <span
-            className={`text-lg ${
+            className={`text-xl font-bold ${
               assignment.isCompleted ? "text-green-500" : "text-red-500"
             }`}
           >
@@ -79,7 +214,7 @@ const AssignmentReviewPage = () => {
           </span>
           {!assignment.isCompleted && (
             <Button
-              onClick={handleAssignmentSubmission}
+              onClick={handleAssignmentSubmissionView}
               className="bg-blue-500 text-white px-4 py-2 rounded"
             >
               View Submission
@@ -97,14 +232,19 @@ const AssignmentReviewPage = () => {
               }`}
             >
               <div>
-                <p className="font-bold dark:text-zinc-600">
-                  {subtask.description}
-                </p>
-                <p className="dark:text-zinc-600">Points: {subtask.points}</p>
+                <p className="font-bold">{subtask.description}</p>
+                <p>Max Points: {subtask.points}</p>
+                <p>Points Assigned: {subtask.pointsAssigned}</p>
               </div>
-              <div className="flex items-center ">
-                <label className="mr-2 dark:text-zinc-600">
+              <div>
+                <label className="mr-2">
                   Status:{" "}
+                  <input
+                    type="checkbox"
+                    checked={subtask.completed}
+                    onChange={() => handleSubtaskToggle(index)}
+                    className="mr-2"
+                  />
                   <span
                     className={`${
                       subtask.completed ? "text-green-500" : "text-red-500"
@@ -113,23 +253,17 @@ const AssignmentReviewPage = () => {
                     {subtask.completed ? "Completed" : "Incomplete"}
                   </span>
                 </label>
-                <input
-                  type="checkbox"
-                  checked={subtask.completed}
-                  onChange={() => handleSubtaskToggle(index)}
-                  className="mr-4"
-                />
-                <input
+                <Input
                   type="number"
-                  value={subtask.points}
+                  value={subtask.pointsAssigned}
                   onChange={(e) =>
                     handlePointsChange(index, parseInt(e.target.value, 10))
                   }
-                  className="w-20 p-2 border border-gray-300 rounded-lg mr-4 dark:text-zinc-600"
+                  className="w-20 ml-2"
                 />
                 <Button
-                  onClick={() => handleSubtaskUpdate(index)}
-                  className="bg-blue-500 text-white px-4 py-2 rounded"
+                  onClick={() => handleUpdateSubtask(index)}
+                  className="bg-green-500 text-white px-4 py-2 rounded ml-2"
                 >
                   Update
                 </Button>
@@ -138,44 +272,48 @@ const AssignmentReviewPage = () => {
           ))}
         </div>
 
-        <div className="mt-6">
-          <h2 className="text-xl font-bold mb-2">Feedback & Comments</h2>
-          <div className="flex">
+        <div className="mt-8">
+          <h2 className="text-xl font-bold mb-2">Comments</h2>
+          <div className="space-y-4">
+            {comments.map((comment, index) => (
+              <div
+                key={index}
+                className={`p-4 border border-gray-300 rounded-lg shadow-sm ${
+                  comment.isReviewer ? "bg-gray-100" : ""
+                }`}
+              >
+                <p className="font-bold">
+                  {comment.isReviewer ? "Reviewer" : "Reviewee"}
+                </p>
+                <p>{comment.feedback}</p>
+                <p className="text-sm text-gray-500">
+                  {new Date(comment.time).toLocaleString()}
+                </p>
+              </div>
+            ))}
+          </div>
+          <div className="mt-4">
             <Textarea
               value={newComment}
               onChange={(e) => setNewComment(e.target.value)}
-              placeholder="Add your comment..."
-              className="w-full p-4 border border-gray-300 rounded-lg"
+              placeholder="Add a comment"
+              className="w-full mb-2"
             />
             <Button
-              className="ml-4 bg-blue-500 text-white px-4 py-2 rounded"
               onClick={handleCommentSubmit}
+              className="bg-blue-500 text-white px-4 py-2 rounded"
             >
-              Post Comment
+              Submit Comment
             </Button>
-          </div>
-        </div>
-
-        <div className="mt-8">
-          <h2 className="text-2xl font-bold mb-4">Comments</h2>
-          <div className="space-y-4">
-            {comments.length > 0 ? (
-              comments.map((comment, index) => (
-                <div
-                  key={index}
-                  className="p-4 border rounded-lg bg-gray-100 dark:text-zinc-600"
-                >
-                  <strong>{comment.author}:</strong>
-                  <p>{comment.message}</p>
-                </div>
-              ))
-            ) : (
-              <p>No comments yet.</p>
-            )}
           </div>
         </div>
       </div>
       <GlobalChatAssignment />
+      <SubmissionViewModal
+        isOpen={isModalOpen}
+        onClose={handleModalClose}
+        submissionData={submissionData}
+      />
     </div>
   );
 };

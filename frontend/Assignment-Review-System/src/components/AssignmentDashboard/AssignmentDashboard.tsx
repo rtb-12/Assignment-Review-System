@@ -1,6 +1,6 @@
 import React from "react";
 
-import { TabsDemo } from "./Tabs";
+import { TabsAssignmentDashboard } from "./Tabs";
 
 const AssignmentdashboardPage = () => {
   return (
@@ -10,8 +10,7 @@ const AssignmentdashboardPage = () => {
         <h1 className="text-3xl font-bold mb-4 text-gray-900 dark:text-gray-50">
           Assignment's Dashboard
         </h1>
-        {/* Tabs with content inside */}
-        <TabsDemo />
+        <TabsAssignmentDashboard />
       </div>
     </div>
   );

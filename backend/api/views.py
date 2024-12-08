@@ -22,7 +22,7 @@ from .models import (AssignmentDetails, AssignmentRoles, AssignmentStatus, Group
                      UserDetails,
                      WorkspaceMembers,
                      GroupMembers)
-from .serializers import (AddGroupMemberSerializer, AssignmentCreateSerializer, AssignmentDetailsSerializer, AssignmentDetailsViewSerializer, AssignmentFeedbackSerializer, AssignmentRevieweeViewSerializer, AssignmentRoleSerializer, AssignmentStatusDetailSerializer, AssignmentSubmissionSerializer, AssignmentSubtaskUpdateSerializer, BaseAssignmentSerializer, GroupSerializer, LeaderboardSerializer, WorkspaceCreateSerializer,
+from .serializers import (AddGroupMemberSerializer, AssignmentCreateSerializer, AssignmentDetailsSerializer, AssignmentDetailsViewSerializer, AssignmentFeedbackSerializer, AssignmentRevieweeViewSerializer, AssignmentRoleSerializer, AssignmentStatusDetailSerializer, AssignmentSubmissionSerializer, AssignmentSubtaskUpdateSerializer, BaseAssignmentSerializer, GroupSerializer, LeaderboardSerializer, RevieweeSubmissionSerializer, RevieweeSubtaskSerializer, SubtaskStatusUpdateSerializer, WorkspaceCreateSerializer,
                           UserRegistrationSerializer,
                           UserLoginSerializer,
                           ProfileUpdateSerializer,
@@ -426,6 +426,44 @@ class CreateAssignment(generics.CreateAPIView):
         return Response(assignment_serializer.data, status=status.HTTP_201_CREATED)
 
 
+class UpdateAssignment(generics.UpdateAPIView):
+    serializer_class = AssignmentCreateSerializer
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+
+    def update(self, request, workspace_id, assignment_id):
+        user = request.user
+        data = request.data
+
+        try:
+            workspace = WorkspaceDetail.objects.get(workspace_id=workspace_id)
+        except WorkspaceDetail.DoesNotExist:
+            return Response({"detail": "Workspace not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if not WorkspaceMembers.objects.filter(workspace_id=workspace, user_id=user).exists():
+            return Response({"detail": "You are not a member of this workspace."}, status=status.HTTP_403_FORBIDDEN)
+
+        if not AssignmentRoles.objects.filter(user=user, role_id=2).exists():
+            return Response({"detail": "You do not have permission to update this assignment."}, status=status.HTTP_403_FORBIDDEN)
+
+        try:
+            assignment = AssignmentDetails.objects.get(
+                workspace_id=workspace, assignment_id=assignment_id)
+        except AssignmentDetails.DoesNotExist:
+            return Response({"detail": "Assignment not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        individual_members = request.data.get('individual_members', [])
+
+        assignment_serializer = self.get_serializer(assignment, data=data, context={
+                                                    'workspace_id': workspace_id, 'request': request, 'individual_members': individual_members}, partial=True)
+        if not assignment_serializer.is_valid():
+            return Response(assignment_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        assignment_serializer.save()
+
+        return Response(assignment_serializer.data, status=status.HTTP_200_OK)
+
+
 class ManageAssignmentRolesView(generics.CreateAPIView):
     serializer_class = AssignmentRoleSerializer
     permission_classes = [IsAuthenticated]
@@ -450,18 +488,26 @@ class AssignmentSubmissionView(generics.UpdateAPIView):
     serializer_class = AssignmentSubmissionSerializer
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
-    lookup_field = 'submission_id'
 
     def update(self, request, *args, **kwargs):
         user = request.user
-        submission_id = kwargs.get('submission_id')
-        try:
-            assignment_status = AssignmentStatus.objects.get(
-                submission_id=submission_id, user=user)
-        except AssignmentStatus.DoesNotExist:
+        assignment_id = kwargs.get('assignment_id')
+        assignment_statuses = AssignmentStatus.objects.filter(
+            assignment_id=assignment_id, user=user)
+
+        if not assignment_statuses.exists():
             return Response({"detail": "Submission not found or you do not have permission to update this submission."}, status=status.HTTP_404_NOT_FOUND)
 
-        return super().update(request, *args, **kwargs)
+        for assignment_status in assignment_statuses:
+            serializer = self.get_serializer(
+                assignment_status, data=request.data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            self.perform_update(serializer)
+            # Update the status to "started"
+            assignment_status.status = "started"
+            assignment_status.save()
+
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class LeaderboardView(generics.ListAPIView):
@@ -518,7 +564,7 @@ class OngoingAssignmentsView(generics.ListAPIView):
         ).select_related('assignment')
 
         # Filter assignments where not all subtasks are completed
-        filtered_assignments = []
+        filtered_assignments = set()
         for assignment_status in ongoing_assignments:
             subtask_statuses = AssignmentStatus.objects.filter(
                 assignment=assignment_status.assignment,
@@ -526,19 +572,14 @@ class OngoingAssignmentsView(generics.ListAPIView):
             ).values_list('status', flat=True)
 
             if 'completed' not in subtask_statuses:
-                filtered_assignments.append(assignment_status)
+                filtered_assignments.add(assignment_status.assignment)
 
-        return filtered_assignments
+        return list(filtered_assignments)
 
     def list(self, request, *args, **kwargs):
-        user = self.request.user
-
-        # Check if the user is assigned any assignments with role value 1
-        assigned_assignments = AssignmentRoles.objects.filter(
-            user=user, role_id=1).exists()
-
-        # Return whether the user is assigned the assignment or not
-        return Response({'assigned': assigned_assignments}, status=status.HTTP_200_OK)
+        queryset = self.get_queryset()
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class CompletedAssignmentsView(generics.ListAPIView):
@@ -723,8 +764,8 @@ class ListReveiweeForAssignmentView(generics.ListAPIView):
             return Response({"detail": "You are not a reviewer for this assignment"}, status=status.HTTP_403_FORBIDDEN)
 
         students = AssignmentRoles.objects.filter(
-            assignment=assignment, role_id=1).values_list('user', flat=True)
-        students = UserDetails.objects.filter(id__in=students)
+            assignment=assignment, role_id=1).values_list('user_id', flat=True)
+        students = UserDetails.objects.filter(user_id__in=students)
 
         serializer = AssignmentRevieweeViewSerializer(
             students, many=True, context={'assignment_id': assignment_id})
@@ -823,19 +864,56 @@ class UpdateSubtaskFeedbackView(generics.UpdateAPIView):
             reviewer = AssignmentRoles.objects.get(
                 assignment=assignment, user=user, role_id=2)
         except AssignmentRoles.DoesNotExist:
-            return Response({"detail": "You are not a reviewer for this assignment"}, status=status.HTTP_403_FORBIDDEN)
+            reviewer = None
 
-        try:
-            reviewee_assignment = AssignmentStatus.objects.get(
-                assignment=assignment, user=reviewee)
-        except AssignmentStatus.DoesNotExist:
+        if not reviewer and user != reviewee:
+            return Response({"detail": "You do not have permission to comment on this assignment"}, status=status.HTTP_403_FORBIDDEN)
+
+        reviewee_assignments = AssignmentStatus.objects.filter(
+            assignment=assignment, user=reviewee)
+
+        if not reviewee_assignments.exists():
             return Response({"detail": "Reviewee assignment not found"}, status=status.HTTP_404_NOT_FOUND)
 
-        serializer = self.get_serializer(
-            reviewee_assignment, data=request.data, partial=True)
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
+        for reviewee_assignment in reviewee_assignments:
+            serializer = self.get_serializer(
+                reviewee_assignment, data=request.data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
 
+        return Response({"detail": "All matching records updated successfully."}, status=status.HTTP_200_OK)
+
+
+class ListFeedbackView(generics.ListAPIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+    serializer_class = AssignmentFeedbackSerializer
+
+    def list(self, request, *args, **kwargs):
+        user = request.user
+        workspace_id = kwargs.get('workspace_id')
+        assignment_id = kwargs.get('assignment_id')
+        reviewee_id = kwargs.get('reviewee_id')
+        try:
+            workspace = WorkspaceDetail.objects.get(workspace_id=workspace_id)
+        except WorkspaceDetail.DoesNotExist:
+            return Response({"detail": "Workspace not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            reviewee = UserDetails.objects.get(user_id=reviewee_id)
+        except UserDetails.DoesNotExist:
+            return Response({"detail": "Reviewee not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            assignment = AssignmentDetails.objects.get(
+                workspace_id=workspace_id, assignment_id=assignment_id)
+        except AssignmentDetails.DoesNotExist:
+            return Response({"detail": "Assignment not found in this workspace"}, status=status.HTTP_404_NOT_FOUND)
+
+        feedback_view = AssignmentStatus.objects.filter(
+            assignment=assignment, user=reviewee)
+        feedback_view = feedback_view.first()
+        serializer = self.get_serializer(feedback_view)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
@@ -875,3 +953,136 @@ class ListGroupsInWorkspaceView(generics.ListAPIView):
             return Response({"detail": "You do not have permission to view groups in this workspace."}, status=status.HTTP_403_FORBIDDEN)
 
         return GroupDetails.objects.filter(workspace_id=workspace_id)
+
+
+class FetchSubmissionOfReviwee(generics.RetrieveAPIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+    serializer_class = RevieweeSubmissionSerializer
+
+    def get(self, request, *args, **kwargs):
+        user = request.user
+        workspace_id = kwargs.get('workspace_id')
+        assignment_id = kwargs.get('assignment_id')
+        reviwee_id = kwargs.get('reviwee_id')
+
+        try:
+            workspace = WorkspaceDetail.objects.get(workspace_id=workspace_id)
+        except WorkspaceDetail.DoesNotExist:
+            return Response({"detail": "Workspace not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            assignment = AssignmentDetails.objects.get(
+                workspace_id=workspace, assignment_id=assignment_id)
+        except AssignmentDetails.DoesNotExist:
+            return Response({"detail": "Assignment not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            reviewer = AssignmentRoles.objects.get(
+                assignment=assignment, user=user, role_id=2)
+        except AssignmentRoles.DoesNotExist:
+            return Response({"detail": "You are not a reviewer for this assignment"}, status=status.HTTP_403_FORBIDDEN)
+
+        try:
+            reviwee = UserDetails.objects.get(user_id=reviwee_id)
+        except UserDetails.DoesNotExist:
+            return Response({"detail": "Reviwee not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        reviwee_assignments = AssignmentStatus.objects.filter(
+            assignment=assignment, user=reviwee)
+
+        if not reviwee_assignments.exists():
+            return Response({"detail": "Reviwee assignment not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        reviwee_assignment = reviwee_assignments.first()
+
+        serializer = self.get_serializer(reviwee_assignment)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class ListRevieweeSubtasksView(generics.ListAPIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+    serializer_class = RevieweeSubtaskSerializer
+
+    def get(self, request, *args, **kwargs):
+        user = request.user
+        workspace_id = kwargs.get('workspace_id')
+        assignment_id = kwargs.get('assignment_id')
+        reviewee_id = kwargs.get('reviewee_id')
+
+        try:
+            workspace = WorkspaceDetail.objects.get(workspace_id=workspace_id)
+        except WorkspaceDetail.DoesNotExist:
+            return Response({"detail": "Workspace not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            assignment = AssignmentDetails.objects.get(
+                workspace_id=workspace, assignment_id=assignment_id)
+        except AssignmentDetails.DoesNotExist:
+            return Response({"detail": "Assignment not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            reviewer = AssignmentRoles.objects.get(
+                assignment=assignment, user=user, role_id=2)
+        except AssignmentRoles.DoesNotExist:
+            return Response({"detail": "You are not a reviewer for this assignment"}, status=status.HTTP_403_FORBIDDEN)
+
+        try:
+            reviewee = UserDetails.objects.get(user_id=reviewee_id)
+        except UserDetails.DoesNotExist:
+            return Response({"detail": "Reviewee not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        reviewee_subtasks = AssignmentStatus.objects.filter(
+            assignment=assignment, user=reviewee)
+
+        serializer = self.get_serializer(reviewee_subtasks, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class UpdateSubtaskStatusView(generics.UpdateAPIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
+    serializer_class = SubtaskStatusUpdateSerializer
+
+    def update(self, request, *args, **kwargs):
+        user = request.user
+        workspace_id = kwargs.get('workspace_id')
+        assignment_id = kwargs.get('assignment_id')
+        reviewee_id = kwargs.get('reviewee_id')
+        task_id = kwargs.get('task_id')
+
+        try:
+            workspace = WorkspaceDetail.objects.get(workspace_id=workspace_id)
+        except WorkspaceDetail.DoesNotExist:
+            return Response({"detail": "Workspace not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            assignment = AssignmentDetails.objects.get(
+                workspace_id=workspace, assignment_id=assignment_id)
+        except AssignmentDetails.DoesNotExist:
+            return Response({"detail": "Assignment not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            reviewer = AssignmentRoles.objects.get(
+                assignment=assignment, user=user, role_id=2)
+        except AssignmentRoles.DoesNotExist:
+            return Response({"detail": "You are not a reviewer for this assignment"}, status=status.HTTP_403_FORBIDDEN)
+
+        try:
+            reviewee = UserDetails.objects.get(user_id=reviewee_id)
+        except UserDetails.DoesNotExist:
+            return Response({"detail": "Reviewee not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            reviewee_assignment = AssignmentStatus.objects.get(
+                assignment=assignment, user=reviewee, task_id=task_id)
+        except AssignmentStatus.DoesNotExist:
+            return Response({"detail": "Reviewee assignment not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = self.get_serializer(
+            reviewee_assignment, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        return Response(serializer.data, status=status.HTTP_200_OK)
