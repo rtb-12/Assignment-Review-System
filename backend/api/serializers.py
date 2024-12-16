@@ -162,6 +162,22 @@ class AssignmentCreateSerializer(serializers.ModelSerializer):
             "attachments"
         ]
 
+    def update(self, instance, validated_data):
+        attachments = validated_data.pop('attachments', None)
+        subtask_details = validated_data.pop('subtask_details', None)
+
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+
+        if attachments is not None:
+            instance.attachments = attachments
+
+        if subtask_details is not None:
+            instance.subtask_details = subtask_details
+
+        instance.save()
+        return instance
+
     def create(self, validated_data):
         user = self.context['request'].user
         assignor = UserDetails.objects.get(user_id=user.user_id)
@@ -202,7 +218,7 @@ class AssignmentCreateSerializer(serializers.ModelSerializer):
                         assignment=assignment,
                         task_id=subtask['subtask_id'],
                         status='not_started',
-                        reviewer=assignor_role,  # Assign the assignor's role as the reviewer
+                        reviewer=assignor_role,
                         submission_id='',
                         submission_link='',
                         submission_doc='',
@@ -224,12 +240,11 @@ class AssignmentCreateSerializer(serializers.ModelSerializer):
 class AssignmentSubmissionSerializer(serializers.ModelSerializer):
     submission_attachments = serializers.ListField(
         child=serializers.FileField(), required=False)
-    comments = serializers.CharField(required=False, allow_blank=True)
 
     class Meta:
         model = AssignmentStatus
-        fields = ['task_id', 'status', 'submission_link',
-                  'submission_doc', 'comments', 'submission_attachments']
+        fields = ['submission_link', 'submission_doc',
+                  'submission_attachments']
 
     def update(self, instance, validated_data):
         submission_attachments = validated_data.pop(
@@ -259,13 +274,8 @@ class LeaderboardSerializer(serializers.ModelSerializer):
 
 
 class BaseAssignmentSerializer(serializers.ModelSerializer):
-    assignment_id = serializers.IntegerField(source='assignment.assignment_id')
-    assignment_name = serializers.CharField(
-        source='assignment.assignment_description')
-    deadline = serializers.DateTimeField(source='assignment.deadline')
-
     class Meta:
-        model = AssignmentStatus
+        model = AssignmentDetails
         fields = ['assignment_id', 'assignment_name', 'deadline']
 
 
@@ -309,7 +319,8 @@ class AssignmentRevieweeViewSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = UserDetails
-        fields = ['name', 'profile_img', 'points', 'status']
+        fields = ['user_id', 'name', 'profile_img',
+                  'points', 'status']  # Include user_id
 
     def get_points(self, obj):
         assignment_id = self.context.get('assignment_id')
@@ -335,6 +346,7 @@ class AssignmentDetailsViewSerializer(serializers.ModelSerializer):
             'assignment_id',
             'assignment_name',
             'assignment_description',
+            'assignor',
             'subtask_details',
             'deadline',
             'attachments'
@@ -356,12 +368,66 @@ class AssignmentSubtaskUpdateSerializer(serializers.ModelSerializer):
 
 
 class AssignmentFeedbackSerializer(serializers.ModelSerializer):
+    feedback_details = serializers.JSONField()
+
     class Meta:
         model = AssignmentStatus
         fields = ['feedback_details']
 
     def update(self, instance, validated_data):
-        instance.feedback_details = validated_data.get(
+        feedback_details = validated_data.get(
             'feedback_details', instance.feedback_details)
+        instance.feedback_details = feedback_details
+        instance.save()
+        return instance
+
+
+class RevieweeSubmissionSerializer(serializers.ModelSerializer):
+    user_id = serializers.IntegerField(source='user.user_id')
+    submission_link = serializers.URLField()
+    submission_doc = serializers.CharField()
+    submission_attachments = serializers.JSONField()
+
+    class Meta:
+        model = AssignmentStatus
+        fields = ['user_id', 'submission_link',
+                  'submission_doc', 'submission_attachments']
+
+
+class RevieweeSubtaskSerializer(serializers.ModelSerializer):
+    subtask_name = serializers.SerializerMethodField()
+    subtask_max_points = serializers.SerializerMethodField()
+    status = serializers.CharField()
+    points_assigned = serializers.IntegerField(source='points_assign')
+    subtask_id = serializers.CharField(
+        source='task_id')  # Add subtask_id field
+
+    class Meta:
+        model = AssignmentStatus
+        fields = ['subtask_id', 'subtask_name',
+                  'subtask_max_points', 'status', 'points_assigned']
+
+    def get_subtask_name(self, obj):
+        assignment = obj.assignment
+        subtask = next(
+            (sub for sub in assignment.subtask_details if sub['subtask_id'] == obj.task_id), None)
+        return subtask['description'] if subtask else None
+
+    def get_subtask_max_points(self, obj):
+        assignment = obj.assignment
+        subtask = next(
+            (sub for sub in assignment.subtask_details if sub['subtask_id'] == obj.task_id), None)
+        return subtask['points'] if subtask else None
+
+
+class SubtaskStatusUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AssignmentStatus
+        fields = ['status', 'points_assign']
+
+    def update(self, instance, validated_data):
+        instance.status = validated_data.get('status', instance.status)
+        instance.points_assign = validated_data.get(
+            'points_assign', instance.points_assign)
         instance.save()
         return instance

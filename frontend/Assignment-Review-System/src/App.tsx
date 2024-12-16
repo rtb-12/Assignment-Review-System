@@ -76,18 +76,21 @@ function App() {
             element={<AssignmentCreationPage />}
           />
           <Route
-            path="/assignment-submission"
+            path="/workspace/:workspaceId/assignment/:assignmentId"
             element={<AssignmentSubmissionPage />}
           />
           <Route
-            path="/assignment-dashboard"
+            path="/workspace/:workspaceId/assignment-dashboard"
             element={<AssignmentdashboardPage />}
           />
           <Route
-            path="/assignment-reviewer"
+            path="/workspace/:workspaceId/assignment/:assignmentId/assignment-reviewer"
             element={<AssignmentReviewerCard />}
           />
-          <Route path="/assignment-review" element={<AssignmentReviewPage />} />
+          <Route
+            path="/workspace/:workspaceId/assignment/:assignmentId/assignment-reviewer/user/:revieweeId"
+            element={<AssignmentReviewPage />}
+          />
           <Route
             path="/workspace/:workspaceId/groupManagement"
             element={<GroupManagement />}

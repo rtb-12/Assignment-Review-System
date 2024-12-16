@@ -16,6 +16,7 @@ const fetchOngoingAssignments = async () => {
         },
       }
     );
+    console.log(response.data);
     return response.data;
   } catch (error) {
     console.error("Error fetching ongoing assignments:", error);
@@ -58,11 +59,21 @@ const fetchCompletedAssignmnets = async () => {
 };
 
 export function TabsUser() {
-  const [ongoingAssignments, setOngoingAssignments] = useState([]);
-  const [deadlineCrossedAssignments, setDeadlineCrossedAssignments] = useState(
+  interface Assignment {
+    assignment_id: number;
+    assignment_name: string;
+    deadline: string;
+  }
+
+  const [ongoingAssignments, setOngoingAssignments] = useState<Assignment[]>(
     []
   );
-  const [completedAssignments, setCompletedAssignments] = useState([]);
+  const [deadlineCrossedAssignments, setDeadlineCrossedAssignments] = useState<
+    Assignment[]
+  >([]);
+  const [completedAssignments, setCompletedAssignments] = useState<
+    Assignment[]
+  >([]);
 
   useEffect(() => {
     const getCompletedAssignments = async () => {
@@ -86,6 +97,7 @@ export function TabsUser() {
     const getOngoingAssignments = async () => {
       const data = await fetchOngoingAssignments();
       setOngoingAssignments(data);
+      console.log("Ongoing Assignments Data:", data);
     };
 
     getOngoingAssignments();
@@ -99,10 +111,12 @@ export function TabsUser() {
         <div className="w-full h-full relative overflow-x-auto rounded-2xl p-6 text-xl md:text-4xl font-bold text-gray-900 dark:text-gray-50 bg-gradient-to-br from-gray-200 to-gray-300 dark:from-gray-800 dark:to-gray-900 bg-opacity-70">
           <p className="pb-4">Ongoing Assignments</p>
           <div className="flex flex-row gap-4 overflow-x-auto flex-nowrap">
-            {/* Render AssignmentCard components dynamically */}
             {Array.isArray(ongoingAssignments) &&
               ongoingAssignments.map((assignment) => (
-                <AssignmentCard key={assignment.id} assignment={assignment} />
+                <AssignmentCard
+                  key={assignment.assignment_id}
+                  assignment={assignment}
+                />
               ))}
           </div>
         </div>

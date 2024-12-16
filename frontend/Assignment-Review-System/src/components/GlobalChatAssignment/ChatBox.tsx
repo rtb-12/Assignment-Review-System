@@ -22,7 +22,7 @@ const GlobalChatAssignment = () => {
   };
 
   return (
-    <div className="md:w-1/4 mt-8 md:mt-0">
+    <div className=" mt-8 md:mt-0">
       <h2 className="text-xl font-bold mb-4">Global Assignment Chat</h2>
       <div className="bg-gray-100 dark:bg-gray-800 h-[30rem] p-4 rounded-lg overflow-y-auto mb-4 space-y-4">
         {chatMessages.map((msg, index) => (

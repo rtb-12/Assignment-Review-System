@@ -44,6 +44,14 @@ const Sidebar = () => {
     }
   };
 
+  const handleReviewAssignmentClick = () => {
+    if (workspaceId) {
+      navigate(`/workspace/${workspaceId}/assignment-dashboard`);
+    } else {
+      console.error("No workspace ID not found");
+    }
+  };
+
   const handleLogout = () => {
     Cookies.remove("access");
     Cookies.remove("refresh");
@@ -92,7 +100,11 @@ const Sidebar = () => {
             <IconFilePlus className="h-5 w-5 mr-3" />
             <span className="text-base">Create Assignment</span>
           </li>
-          <li className="flex items-center py-3 px-4 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition duration-200">
+          <li
+            className="flex items-center py-3 px-4 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition duration-200"
+            role="button"
+            onClick={handleReviewAssignmentClick}
+          >
             <IconCheck className="h-5 w-5 mr-3" />
             <span className="text-base">Review Assignment</span>
           </li>
