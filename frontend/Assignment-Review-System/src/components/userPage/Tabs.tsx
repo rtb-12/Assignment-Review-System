@@ -5,18 +5,19 @@ import { Tabs } from "../ui/tabs";
 import { AssignmentCard } from "./AssignmentCard";
 import axios from "axios";
 import Cookies from "js-cookie";
+import { useSelector } from "react-redux";
+import { RootState } from "../../store/store";
 
-const fetchOngoingAssignments = async () => {
+const fetchOngoingAssignments = async (workspaceId: string) => {
   try {
     const response = await axios.get(
-      "http://localhost:8000/api/ongoing-assignments",
+      `http://localhost:8000/api/ongoing-assignments/`,
       {
         headers: {
           Authorization: `Bearer ${Cookies.get("access")}`,
         },
       }
     );
-    console.log(response.data);
     return response.data;
   } catch (error) {
     console.error("Error fetching ongoing assignments:", error);
@@ -24,10 +25,10 @@ const fetchOngoingAssignments = async () => {
   }
 };
 
-const fetchDeadlineCrossedAssignments = async () => {
+const fetchDeadlineCrossedAssignments = async (workspaceId: string) => {
   try {
     const response = await axios.get(
-      "http://localhost:8000/api/crossed-deadline-assignments/",
+      `http://localhost:8000/api/crossed-deadline-assignments/`,
       {
         headers: {
           Authorization: `Bearer ${Cookies.get("access")}`,
@@ -41,10 +42,10 @@ const fetchDeadlineCrossedAssignments = async () => {
   }
 };
 
-const fetchCompletedAssignmnets = async () => {
+const fetchCompletedAssignments = async (workspaceId: string) => {
   try {
     const response = await axios.get(
-      "http://localhost:8000/api/completed-assignments/",
+      `http://localhost:8000/api/completed-assignments/`,
       {
         headers: {
           Authorization: `Bearer ${Cookies.get("access")}`,
@@ -65,6 +66,10 @@ export function TabsUser() {
     deadline: string;
   }
 
+  const workspaceId = useSelector(
+    (state: RootState) => state.workspace.workspaceId
+  );
+  const [isLoading, setIsLoading] = useState(true);
   const [ongoingAssignments, setOngoingAssignments] = useState<Assignment[]>(
     []
   );
@@ -75,95 +80,81 @@ export function TabsUser() {
     Assignment[]
   >([]);
 
+  // Combined useEffect for all assignment fetches
   useEffect(() => {
-    const getCompletedAssignments = async () => {
-      const data = await fetchCompletedAssignmnets();
-      setCompletedAssignments(data);
+    const fetchAllAssignments = async () => {
+      if (!workspaceId) return;
+
+      setIsLoading(true);
+      try {
+        const [ongoing, deadlineCrossed, completed] = await Promise.all([
+          fetchOngoingAssignments(workspaceId),
+          fetchDeadlineCrossedAssignments(workspaceId),
+          fetchCompletedAssignments(workspaceId),
+        ]);
+
+        setOngoingAssignments(ongoing);
+        setDeadlineCrossedAssignments(deadlineCrossed);
+        setCompletedAssignments(completed);
+      } catch (error) {
+        console.error("Error fetching assignments:", error);
+      } finally {
+        setIsLoading(false);
+      }
     };
 
-    getCompletedAssignments();
-  }, []);
+    fetchAllAssignments();
+  }, [workspaceId]);
 
-  useEffect(() => {
-    const getDeadlineCrossedAssignments = async () => {
-      const data = await fetchDeadlineCrossedAssignments();
-      setDeadlineCrossedAssignments(data);
-    };
-
-    getDeadlineCrossedAssignments();
-  }, []);
-
-  useEffect(() => {
-    const getOngoingAssignments = async () => {
-      const data = await fetchOngoingAssignments();
-      setOngoingAssignments(data);
-      console.log("Ongoing Assignments Data:", data);
-    };
-
-    getOngoingAssignments();
-  }, []);
+  const renderAssignments = (assignments: Assignment[], title: string) => (
+    <div className="w-full h-full relative overflow-x-auto rounded-2xl p-6 text-xl md:text-4xl font-bold text-gray-900 dark:text-gray-50 bg-gradient-to-br from-gray-200 to-gray-300 dark:from-gray-800 dark:to-gray-900 bg-opacity-70">
+      <p className="pb-4">{title}</p>
+      {isLoading ? (
+        <p>Loading assignments...</p>
+      ) : (
+        <div className="flex flex-row gap-4 overflow-x-auto flex-nowrap">
+          {assignments.length > 0 ? (
+            assignments.map((assignment) => (
+              <AssignmentCard
+                key={assignment.assignment_id}
+                assignment={assignment}
+              />
+            ))
+          ) : (
+            <p>No assignments found</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
 
   const tabs = [
     {
       title: "Ongoing Assignments",
-      value: "Ongoing Assignments",
-      content: (
-        <div className="w-full h-full relative overflow-x-auto rounded-2xl p-6 text-xl md:text-4xl font-bold text-gray-900 dark:text-gray-50 bg-gradient-to-br from-gray-200 to-gray-300 dark:from-gray-800 dark:to-gray-900 bg-opacity-70">
-          <p className="pb-4">Ongoing Assignments</p>
-          <div className="flex flex-row gap-4 overflow-x-auto flex-nowrap">
-            {Array.isArray(ongoingAssignments) &&
-              ongoingAssignments.map((assignment) => (
-                <AssignmentCard
-                  key={assignment.assignment_id}
-                  assignment={assignment}
-                />
-              ))}
-          </div>
-        </div>
-      ),
+      value: "ongoing",
+      content: renderAssignments(ongoingAssignments, "Ongoing Assignments"),
     },
     {
       title: "Deadline Crossed",
-      value: "Deadline Crossed",
-      content: (
-        <div className="w-full h-full relative overflow-x-auto rounded-2xl p-6 text-xl md:text-4xl font-bold text-gray-900 dark:text-gray-50 bg-gradient-to-br from-gray-200 to-gray-300 dark:from-gray-800 dark:to-gray-900 bg-opacity-70">
-          <p className="pb-4">Deadline Crossed Assignments</p>
-          <div className="flex flex-row gap-4 overflow-x-auto flex-nowrap">
-            {deadlineCrossedAssignments.map((assignment) => (
-              <AssignmentCard key={assignment.id} assignment={assignment} />
-            ))}
-          </div>
-        </div>
-      ),
-    },
-    {
-      title: "Notifications",
-      value: "Notifications",
-      content: (
-        <div className="w-full h-full relative overflow-auto rounded-2xl p-6 text-xl md:text-4xl font-bold text-gray-900 dark:text-gray-50 bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900 bg-opacity-70">
-          <p className="pb-4">Notifications</p>
-        </div>
+      value: "deadline-crossed",
+      content: renderAssignments(
+        deadlineCrossedAssignments,
+        "Deadline Crossed Assignments"
       ),
     },
     {
       title: "Past Assignments",
-      value: "Past Assignments",
-      content: (
-        <div className="w-full h-full relative overflow-x-auto rounded-2xl p-6 text-xl md:text-4xl font-bold text-gray-900 dark:text-gray-50 bg-gradient-to-br from-gray-200 to-gray-300 dark:from-gray-800 dark:to-gray-900 bg-opacity-70">
-          <p className="pb-4">Past Assignments</p>
-          <div className="flex flex-row gap-4 overflow-x-auto flex-nowrap">
-            {completedAssignments.map((assignment) => (
-              <AssignmentCard key={assignment.id} assignment={assignment} />
-            ))}
-          </div>
-        </div>
-      ),
+      value: "completed",
+      content: renderAssignments(completedAssignments, "Past Assignments"),
     },
   ];
 
   return (
     <div className="h-[20rem] md:h-[40rem] relative flex flex-col max-w-5xl mx-auto w-full items-start justify-start my-[1rem]">
-      <Tabs tabs={tabs} />
+      <Tabs
+        key={`${ongoingAssignments.length}-${deadlineCrossedAssignments.length}-${completedAssignments.length}`}
+        tabs={tabs}
+      />
     </div>
   );
 }

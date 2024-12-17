@@ -15,7 +15,19 @@ const AssignmentReviewPage = () => {
     revieweeId: string;
   }>();
 
-  const [assignment, setAssignment] = useState({
+  interface Subtask {
+    subtask_id: string;
+    description: string;
+    points: number;
+    completed: boolean;
+    pointsAssigned: number;
+  }
+
+  const [assignment, setAssignment] = useState<{
+    isCompleted: boolean;
+    fileUrl: string;
+    subtasks: Subtask[];
+  }>({
     isCompleted: false,
     fileUrl: "/path-to-file",
     subtasks: [],
@@ -30,6 +42,33 @@ const AssignmentReviewPage = () => {
   const [comments, setComments] = useState([]);
 
   useEffect(() => {
+    const fetchAssignmentDetails = async () => {
+      try {
+        const response = await axios.get(
+          `http://localhost:8000/assignment-status/${revieweeId}/${assignmentId}/`,
+          {
+            headers: {
+              Authorization: `Bearer ${Cookies.get("access")}`,
+            },
+          }
+        );
+
+        if (response.status === 200) {
+          const data = response.data;
+          console.log("Assignment Data:", data);
+          // setAssignment(data);
+          setAssignment({
+            ...assignment,
+            isCompleted: data.status === "Completed",
+          });
+          console.log("Assignment:", assignment);
+        } else {
+          console.error("Failed to fetch assignment data");
+        }
+      } catch (error) {
+        console.error("Error fetching assignment data:", error);
+      }
+    };
     const fetchSubtasks = async () => {
       try {
         const response = await axios.get(
@@ -78,7 +117,7 @@ const AssignmentReviewPage = () => {
         console.error("Error fetching comments:", error);
       }
     };
-
+    fetchAssignmentDetails();
     fetchSubtasks();
     fetchComments();
   }, [workspaceId, assignmentId, revieweeId]);
@@ -177,7 +216,7 @@ const AssignmentReviewPage = () => {
     const subtask = assignment.subtasks[index];
     try {
       const response = await axios.put(
-        `http://localhost:8000/api/workspace/${workspaceId}/assignments/${assignmentId}/reviewees/${revieweeId}/subtasks/${subtask.subtask_id}/update-status/`,
+        `http://localhost:8000/api/workspace/${workspaceId}/assignments/${assignmentId}/reviewee/${revieweeId}/subtasks/${subtask.subtask_id}/update-status/`,
         {
           status: subtask.completed ? "Completed" : "Incomplete",
           points_assign: subtask.pointsAssigned,

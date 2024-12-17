@@ -1,8 +1,6 @@
-"use client";
-
-import * as React from "react";
+// frontend/Assignment-Review-System/src/components/AssignmentCreationPage/ComboBox.tsx
+import React, { useState } from "react";
 import { CaretSortIcon, CheckIcon } from "@radix-ui/react-icons";
-
 import { cn } from "../../lib/utils";
 import { Button } from "../../components/ui/button";
 import {
@@ -19,39 +17,25 @@ import {
   PopoverTrigger,
 } from "../../components/ui/popover";
 
-interface Person {
-  name: string;
-  username: string;
-}
-
 interface ComboboxDemoProps {
-  options: Person[];
-  selectedOptions: Person[];
-  setSelectedOptions: (options: Person[]) => void;
+  options: any[];
+  selectedOptions: any[];
+  handleMemberSelect: (member) => void;
+  handleMemberRemove: (member) => void;
 }
 
 export function ComboboxDemo({
   options,
   selectedOptions,
-  setSelectedOptions,
+  handleMemberSelect,
+  handleMemberRemove,
 }: ComboboxDemoProps) {
   const [open, setOpen] = React.useState(false);
   const [value, setValue] = React.useState("");
 
-  const handleSelect = (currentValue: string) => {
-    const selectedPerson = options.find(
-      (person) => person.username === currentValue
-    );
-    if (selectedPerson) {
-      const isSelected = selectedOptions.some(
-        (person) => person.username === currentValue
-      );
-      const newSelectedOptions = isSelected
-        ? selectedOptions.filter((person) => person.username !== currentValue)
-        : [...selectedOptions, selectedPerson];
-      setSelectedOptions(newSelectedOptions);
-    }
-    setValue(currentValue === value ? "" : currentValue);
+  const handleSelect = (selectedPerson) => {
+    handleMemberSelect(selectedPerson);
+    setValue(selectedPerson.name);
     setOpen(false);
   };
 
@@ -64,9 +48,7 @@ export function ComboboxDemo({
           aria-expanded={open}
           className="w-[240px] justify-between"
         >
-          {value
-            ? options.find((person) => person.username === value)?.name
-            : "Select person..."}
+          {value || "Select person..."}
           <CaretSortIcon className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
@@ -78,27 +60,23 @@ export function ComboboxDemo({
             <CommandGroup>
               {options.map((person) => (
                 <CommandItem
-                  key={person.username}
-                  value={person.username}
-                  onSelect={handleSelect}
+                  key={person.user_id}
+                  onSelect={() => handleSelect(person)}
+                  disabled={selectedOptions.some(
+                    (selectedPerson) =>
+                      selectedPerson.user_id === person.user_id
+                  )}
                 >
-                  <div className="flex flex-col">
-                    <span>{person.name}</span>
-                    <span className="text-sm text-gray-500">
-                      @{person.username}
-                    </span>
-                  </div>
-                  <CheckIcon
-                    className={cn(
-                      "ml-auto h-4 w-4",
-                      selectedOptions.some(
-                        (selectedPerson) =>
-                          selectedPerson.username === person.username
-                      )
-                        ? "opacity-100"
-                        : "opacity-0"
-                    )}
-                  />
+                  {person.name}
+                  {selectedOptions.some(
+                    (selectedPerson) =>
+                      selectedPerson.user_id === person.user_id
+                  ) && (
+                    <CheckIcon
+                      className="ml-2 h-4 w-4 text-gray-500"
+                      style={{ pointerEvents: "none" }}
+                    />
+                  )}
                 </CommandItem>
               ))}
             </CommandGroup>

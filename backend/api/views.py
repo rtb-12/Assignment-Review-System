@@ -45,7 +45,8 @@ class OAuth2Handler:
         state = str(uuid.uuid4())
         request.session['oauth_state'] = state
         request.session.save()
-        authorization_url = f"{self.authorization_url}?client_id={self.client_id}&redirect_uri={self.redirect_uri}&state={state}"
+        authorization_url = f"{self.authorization_url}?client_id={
+            self.client_id}&redirect_uri={self.redirect_uri}&state={state}"
         print("authorization_url", authorization_url)
         return redirect(authorization_url)
 
@@ -384,7 +385,7 @@ class RemoveGroupMemberView(generics.DestroyAPIView):
             return Response({"detail": "You do not have permission to remove members from this group."}, status=status.HTTP_403_FORBIDDEN)
 
         try:
-            member_to_remove = UserDetails.objects.get(userID=user_id)
+            member_to_remove = UserDetails.objects.get(user_id=user_id)
         except UserDetails.DoesNotExist:
             return Response({"detail": "User not found."}, status=status.HTTP_404_NOT_FOUND)
 
@@ -941,18 +942,18 @@ class ListGroupsInWorkspaceView(generics.ListAPIView):
         try:
             workspace = WorkspaceDetail.objects.get(workspace_id=workspace_id)
         except WorkspaceDetail.DoesNotExist:
-            return Response({"detail": "Workspace not found."}, status=status.HTTP_404_NOT_FOUND)
+            return []
 
         try:
             membership = WorkspaceMembers.objects.get(
                 workspace_id=workspace, user_id=user)
         except WorkspaceMembers.DoesNotExist:
-            return Response({"detail": "You are not a member of this workspace."}, status=status.HTTP_403_FORBIDDEN)
+            return []
 
-        if membership.workspace_role != '2':
-            return Response({"detail": "You do not have permission to view groups in this workspace."}, status=status.HTTP_403_FORBIDDEN)
-
-        return GroupDetails.objects.filter(workspace_id=workspace_id)
+        return GroupDetails.objects.filter(workspace_id=workspace_id).prefetch_related(
+            'groupmembers_set',
+            'groupmembers_set__userID'
+        )
 
 
 class FetchSubmissionOfReviwee(generics.RetrieveAPIView):

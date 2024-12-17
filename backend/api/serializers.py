@@ -249,20 +249,34 @@ class AssignmentSubmissionSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         submission_attachments = validated_data.pop(
             'submission_attachments', [])
-        instance = super().update(instance, validated_data)
 
-        # Save submission attachments
+        # Update basic fields
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+
+        # Save attachments
+        instance.submission_attachments = []
         for attachment in submission_attachments:
-            file_path = self.save_attachment(attachment)
-            instance.submission_attachments.append(file_path)
+            relative_path = self.save_attachment(attachment)
+            instance.submission_attachments.append(relative_path)
 
         instance.save()
         return instance
 
     def save_attachment(self, attachment):
-        path = os.path.join(settings.MEDIA_ROOT, attachment.name)
-        default_storage.save(path, ContentFile(attachment.read()))
-        return path
+        # Generate safe filename
+        original_name = attachment.name
+        filename = ''.join(
+            e for e in original_name if e.isalnum() or e in '._-')
+
+        # Create relative path from MEDIA_ROOT
+        relative_path = f'submissions/{filename}'
+
+        # Save file using default storage
+        saved_path = default_storage.save(relative_path, attachment)
+
+        # Return path relative to MEDIA_ROOT
+        return saved_path
 
 
 class LeaderboardSerializer(serializers.ModelSerializer):
@@ -300,10 +314,27 @@ class AssignmentRoleSerializer(serializers.ModelSerializer):
         fields = ['assignment_id', 'user_id', 'role_id']
 
 
+class GroupMemberSerializer(serializers.ModelSerializer):
+    name = serializers.CharField(source='userID.name')
+    profile_image = serializers.ImageField(source='userID.profile_image')
+    user_id = serializers.IntegerField(source='userID.user_id')
+
+    class Meta:
+        model = GroupMembers
+        fields = ['name', 'profile_image', 'user_id']
+
+
 class GroupSerializer(serializers.ModelSerializer):
+    members = serializers.SerializerMethodField()
+
     class Meta:
         model = GroupDetails
-        fields = ['groupID', 'groupName', 'workspace_id']
+        fields = ['groupID', 'GroupName', 'workspace_id',
+                  'description', 'groupProfileImage', 'members']
+
+    def get_members(self, obj):
+        group_members = GroupMembers.objects.filter(groupID=obj)
+        return GroupMemberSerializer(group_members, many=True).data
 
 
 class UserProfileSerializer(serializers.ModelSerializer):
