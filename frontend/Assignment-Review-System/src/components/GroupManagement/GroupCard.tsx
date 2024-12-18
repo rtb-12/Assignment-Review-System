@@ -52,18 +52,19 @@ const GroupCard: React.FC<GroupCardProps> = ({
     return `http://localhost:8000/media/${cleanUrl}`;
   };
 
-  console.log(
-    "GroupCardProps:",
-    groupID,
-    GroupName,
-    groupProfileImage,
-    members,
-    allMembers
-  );
+  // console.log(
+  //   "GroupCardProps:",
+  //   groupID,
+  //   GroupName,
+  //   groupProfileImage,
+  //   members,
+  //   allMembers
+  // );
 
   const processedImageUrl = getImageUrl(groupProfileImage);
   const dispatch = useDispatch();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [groupMembers, setGroupMembers] = useState<Member[]>(members);
   const [selectedMembers, setSelectedMembers] = useState<Person[]>([]);
 
   const availableMembers = allMembers.filter(
@@ -90,7 +91,9 @@ const GroupCard: React.FC<GroupCardProps> = ({
       if (response.status === 204) {
         console.log("Member removed successfully");
         window.location.reload();
-        // Optionally, update the members list in the state
+        // setGroupMembers(
+        //   groupMembers.filter((member) => member.user_id !== userID)
+        // );
       }
     } catch (error) {
       console.error("Error removing member:", error);

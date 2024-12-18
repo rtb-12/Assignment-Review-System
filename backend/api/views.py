@@ -326,17 +326,41 @@ class GroupCreateView(generics.CreateAPIView):
         except WorkspaceDetail.DoesNotExist:
             return Response({"detail": "Workspace not found."}, status=status.HTTP_404_NOT_FOUND)
 
+        # Check if user is workspace admin
         if not WorkspaceMembers.objects.filter(workspace_id=workspace, user_id=user, workspace_role='2').exists():
             return Response({"detail": "You do not have permission to create a group in this workspace."}, status=status.HTTP_403_FORBIDDEN)
 
+        # Get members list from request
+        members = request.data.get('members', [])
+        if not isinstance(members, list):
+            try:
+                members = json.loads(members)
+            except json.JSONDecodeError:
+                return Response({"detail": "Invalid members format"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Create group
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        group = serializer.save()
+        group = serializer.save(workspace_id=workspace)
 
-        GroupMembers.objects.create(userID=user, groupID=group)
+        # Add members to group
+        for member_id in members:
+            try:
+                user_to_add = UserDetails.objects.get(user_id=member_id)
+                if WorkspaceMembers.objects.filter(workspace_id=workspace, user_id=user_to_add).exists():
+                    GroupMembers.objects.create(
+                        userID=user_to_add, groupID=group)
+            except UserDetails.DoesNotExist:
+                continue  # Skip if user doesn't exist
 
+        # Add the creator as a member if not already in the list
+        if user.user_id not in members:
+            GroupMembers.objects.create(userID=user, groupID=group)
+
+        # Get updated group data with members
+        group_serializer = GroupSerializer(group)
         headers = self.get_success_headers(serializer.data)
-        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+        return Response(group_serializer.data, status=status.HTTP_201_CREATED, headers=headers)
 
 
 class AddGroupMemberView(generics.CreateAPIView):
@@ -548,31 +572,40 @@ class AssignmentSubmissionView(generics.UpdateAPIView):
 class LeaderboardView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
     authentication_classes = [JWTAuthentication]
+    serializer_class = LeaderboardSerializer
 
     def get(self, request, workspace_id):
         try:
             workspace = WorkspaceDetail.objects.get(workspace_id=workspace_id)
         except WorkspaceDetail.DoesNotExist:
-            return Response({"detail": "Workspace not found."}, status=status.HTTP_404_NOT_FOUND)
+            return Response(
+                {"detail": "Workspace not found."},
+                status=status.HTTP_404_NOT_FOUND
+            )
 
-        # Get the list of users who are members of the workspace
         user_ids = WorkspaceMembers.objects.filter(
-            workspace_id=workspace_id).values_list('user_id', flat=True)
+            workspace_id=workspace_id
+        ).values_list('user_id', flat=True)
 
-        # Filter the AssignmentStatus entries based on these users
-        leaderboard_data = AssignmentStatus.objects.filter(user_id__in=user_ids).select_related('user').values(
-            'user__name', 'user__profile_image').annotate(points=Sum('points_assign')).order_by('-points')
+        leaderboard_data = AssignmentStatus.objects.filter(
+            user_id__in=user_ids
+        ).select_related('user').values(
+            'user__name',
+            'user__profile_image'
+        ).annotate(
+            points=Sum('points_assign')
+        ).order_by('-points')
 
         leaderboard = [
             {
                 'name': data['user__name'],
                 'image': data['user__profile_image'],
-                'points': data['points']
+                'points': data['points'] or 0
             }
             for data in leaderboard_data
         ]
 
-        serializer = LeaderboardSerializer(leaderboard, many=True)
+        serializer = self.get_serializer(leaderboard, many=True)
         return Response(serializer.data)
 
 

@@ -13,6 +13,19 @@ import Cookies from "js-cookie";
 import { useSelector } from "react-redux";
 import { RootState } from "../../store/store";
 
+interface ApiResponse {
+  name: string;
+  profile_image: string;
+  points: number;
+}
+
+interface LeaderboardRowProps {
+  sno: number;
+  name: string;
+  points: number;
+  image: string;
+}
+
 const getMedalColor = (sno: number): string => {
   switch (sno) {
     case 1:
@@ -26,13 +39,6 @@ const getMedalColor = (sno: number): string => {
   }
 };
 
-interface LeaderboardRowProps {
-  sno: number;
-  name: string;
-  points: number;
-  image: string;
-}
-
 const LeaderboardRow: React.FC<LeaderboardRowProps> = ({
   sno,
   name,
@@ -42,16 +48,30 @@ const LeaderboardRow: React.FC<LeaderboardRowProps> = ({
   const isTop3 = sno <= 3;
   return (
     <TableRow className="bg-white dark:bg-gray-800">
-      <TableCell className="text-sm flex items-center py-4 pl-4">
-        {isTop3 && <FaMedal className={`mr-2 text-xl ${getMedalColor(sno)}`} />}
-        {sno}
+      <TableCell className="py-4 px-4 w-24">
+        <div className="flex items-center">
+          {isTop3 && (
+            <FaMedal className={`mr-2 text-xl ${getMedalColor(sno)}`} />
+          )}
+          {sno}
+        </div>
       </TableCell>
-      <TableCell className="text-lg font-semibold py-4 text-gray-900 dark:text-gray-50 flex items-center">
-        <img src={image} alt={name} className="w-8 h-8 rounded-full mr-2" />
-        {name}
+      <TableCell className="py-4 px-4 flex-1">
+        <div className="flex items-center">
+          <img
+            src={image || "https://via.placeholder.com/32"}
+            alt={name}
+            className="w-8 h-8 rounded-full mr-2"
+          />
+          <span className="text-lg font-semibold text-gray-900 dark:text-gray-50">
+            {name}
+          </span>
+        </div>
       </TableCell>
-      <TableCell className="text-lg font-semibold py-4 text-right pr-4 text-gray-900 dark:text-gray-50">
-        {points}
+      <TableCell className="py-4 px-4 w-32 text-right">
+        <span className="text-lg font-semibold text-gray-900 dark:text-gray-50">
+          {points}
+        </span>
       </TableCell>
     </TableRow>
   );
@@ -61,8 +81,6 @@ const Leaderboard = () => {
   const workspaceId = useSelector(
     (state: RootState) => state.workspace.workspaceId
   );
-  console.log("Fetched workspaceId from Redux store:", workspaceId);
-
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardRowProps[]>(
     []
   );
@@ -72,8 +90,7 @@ const Leaderboard = () => {
       console.log("Workspace ID is not available yet.");
       return;
     }
-    // Proceed with the API call if workspaceId exists
-    console.log("useEffect triggered with workspace_id:", workspaceId);
+
     axios
       .get(`http://localhost:8000/api/workspace/${workspaceId}/leaderboard/`, {
         headers: {
@@ -81,8 +98,16 @@ const Leaderboard = () => {
         },
       })
       .then((response) => {
-        console.log("Request successful:", response.data);
-        setLeaderboardData(response.data);
+        // Sort by points in descending order and transform data
+        const transformedData: LeaderboardRowProps[] = response.data
+          .sort((a: ApiResponse, b: ApiResponse) => b.points - a.points)
+          .map((entry: ApiResponse, index: number) => ({
+            sno: index + 1,
+            name: entry.name,
+            points: entry.points,
+            image: entry.profile_image,
+          }));
+        setLeaderboardData(transformedData);
       })
       .catch((error) => {
         console.error(
@@ -100,14 +125,20 @@ const Leaderboard = () => {
       <Table className="w-full bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden">
         <TableHeader>
           <TableRow className="bg-gray-200 dark:bg-gray-700">
-            <TableHead className="text-lg font-bold py-3 pl-4 text-gray-900 dark:text-gray-50">
-              S.No
+            <TableHead className="w-24 px-4 py-3">
+              <span className="text-lg font-bold text-gray-900 dark:text-gray-50">
+                Rank
+              </span>
             </TableHead>
-            <TableHead className="text-lg font-bold py-3 text-gray-900 dark:text-gray-50">
-              Name
+            <TableHead className="px-4 py-3 flex-1">
+              <span className="text-lg font-bold text-gray-900 dark:text-gray-50">
+                Name
+              </span>
             </TableHead>
-            <TableHead className="text-lg font-bold py-3 text-right pr-4 text-gray-900 dark:text-gray-50">
-              Points
+            <TableHead className="w-32 px-4 py-3 text-right">
+              <span className="text-lg font-bold text-gray-900 dark:text-gray-50">
+                Points
+              </span>
             </TableHead>
           </TableRow>
         </TableHeader>

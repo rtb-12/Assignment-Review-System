@@ -279,12 +279,10 @@ class AssignmentSubmissionSerializer(serializers.ModelSerializer):
         return saved_path
 
 
-class LeaderboardSerializer(serializers.ModelSerializer):
+class LeaderboardSerializer(serializers.Serializer):
+    name = serializers.CharField()
+    profile_image = serializers.CharField(source='image', allow_null=True)
     points = serializers.IntegerField()
-
-    class Meta:
-        model = UserDetails
-        fields = ['name', 'image', 'points']
 
 
 class BaseAssignmentSerializer(serializers.ModelSerializer):

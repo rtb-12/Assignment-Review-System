@@ -125,6 +125,20 @@ export const GroupManagement = () => {
       JSON.stringify(selectedMembers.map((member) => member.user_id))
     );
 
+    // Log each key-value pair
+    for (let [key, value] of formData.entries()) {
+      console.log(`${key}: `, value);
+    }
+
+    // Log complete payload
+    console.log("Selected Members:", selectedMembers);
+    console.log("Group Logo:", groupLogo);
+    console.log("Form Data Contents:", {
+      GroupName: groupName,
+      groupProfileImage: groupLogo ? groupLogo.name : "No file selected",
+      description: groupDesc,
+      members: selectedMembers.map((member) => member.user_id),
+    });
     try {
       const response = await axios.post(
         `http://localhost:8000/api/workspace/${workspaceId}/create-group/`,
@@ -143,6 +157,7 @@ export const GroupManagement = () => {
         setGroupLogo(null);
         setGroupDesc("");
         setSelectedMembers([]);
+        window.location.reload();
       }
     } catch (error) {
       console.error("Error creating group:", error);
