@@ -28,6 +28,14 @@ const Sidebar = () => {
     setIsOpen(!isOpen);
   };
 
+  const handleClickOnUserProfile = () => {
+    if (workspaceId) {
+      navigate(`/profile`);
+    } else {
+      console.error("No workspace ID found");
+    }
+  };
+
   const handleClickOnGroupManager = () => {
     if (workspaceId) {
       navigate(`/workspace/${workspaceId}/groupManagement`);
@@ -88,7 +96,11 @@ const Sidebar = () => {
         </div>
 
         <ul className="p-4 space-y-4">
-          <li className="flex items-center py-3 px-4 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition duration-200">
+          <li
+            className="flex items-center py-3 px-4 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition duration-200"
+            role="button"
+            onClick={handleClickOnUserProfile}
+          >
             <IconUser className="h-5 w-5 mr-3" />
             <span className="text-base">Profile</span>
           </li>

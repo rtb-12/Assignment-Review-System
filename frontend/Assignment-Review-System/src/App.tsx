@@ -21,6 +21,7 @@ import OAuthCallback from "./components/OAuthCallback/OAuthCallback";
 import "./App.css";
 import axios from "axios";
 import Cookies from "js-cookie";
+import ProfilePage from "./components/ProfilePage/ProfilePage";
 
 const Home = () => <HomePage />;
 
@@ -69,6 +70,7 @@ function App() {
           <Route path="/" element={<Home />} />
           <Route path="/signup" element={<SignUp />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/profile" element={<ProfilePage />} />
           <Route path="/workspace" element={<Workspace />} />
           <Route path="/workspace/:workspaceId" element={<UserPage />} />
           <Route
