@@ -18,28 +18,29 @@ import Cookies from "js-cookie";
 import { ComboboxDemo } from "./ComboBox";
 
 interface GroupCardProps {
-  groupID: number; // Changed from id
-  GroupName: string; // Changed from name
-  groupProfileImage?: string; // Changed from logo
-  members?: { name: string; profile_image: string; user_id: number }[]; // Made optional
+  groupID: number;
+  GroupName: string;
+  groupProfileImage?: string;
+  members?: Member[];
   allMembers: {
     user_id: number;
     name: string;
     email: string;
     profile_image: string | null;
   }[];
+  description?: string;
 }
 
-interface Person {
-  id: number;
+interface Member {
+  user_id: number;
   name: string;
-  username: string;
+  profile_image: string;
 }
 
 const GroupCard: React.FC<GroupCardProps> = ({
   groupID,
   GroupName,
-  groupProfileImage = "", // Default value
+  groupProfileImage = "",
   members = [],
   allMembers,
   description,
@@ -56,7 +57,8 @@ const GroupCard: React.FC<GroupCardProps> = ({
     groupID,
     GroupName,
     groupProfileImage,
-    members
+    members,
+    allMembers
   );
 
   const processedImageUrl = getImageUrl(groupProfileImage);
@@ -64,6 +66,10 @@ const GroupCard: React.FC<GroupCardProps> = ({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedMembers, setSelectedMembers] = useState<Person[]>([]);
 
+  const availableMembers = allMembers.filter(
+    (member) =>
+      !members.some((groupMember) => groupMember.user_id === member.user_id)
+  );
   const handleCardClick = () => {
     dispatch(setGroupId(groupID.toString()));
     setIsModalOpen(true);
@@ -83,6 +89,7 @@ const GroupCard: React.FC<GroupCardProps> = ({
       );
       if (response.status === 204) {
         console.log("Member removed successfully");
+        window.location.reload();
         // Optionally, update the members list in the state
       }
     } catch (error) {
@@ -95,8 +102,11 @@ const GroupCard: React.FC<GroupCardProps> = ({
 
     try {
       const response = await axios.post(
-        `/api/group/${groupID}/add-member/`,
-        { userID: selectedMembers[0].id },
+        `http://localhost:8000/api/group/${groupID}/add-member/`,
+        {
+          groupID: groupID, // Add this
+          userID: selectedMembers[0].user_id, // Change from .id to .user_id
+        },
         {
           headers: {
             Authorization: `Bearer ${Cookies.get("access")}`,
@@ -106,13 +116,12 @@ const GroupCard: React.FC<GroupCardProps> = ({
       );
       if (response.status === 201) {
         console.log("Member added successfully");
-        // Optionally, update the members list in the state
+        window.location.reload();
       }
     } catch (error) {
       console.error("Error adding member:", error);
     }
   };
-
   const handleMemberSelect = (member: Member) => {
     console.log("Selected member:", member);
     setSelectedMembers((prevMembers) => [...prevMembers, member]);
@@ -154,9 +163,9 @@ const GroupCard: React.FC<GroupCardProps> = ({
 
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
         <div className="p-8">
-          <h2 className="text-2xl font-bold mb-4">{GroupName} - Members</h2>
+          <h2 className="text-2xl font-bold mb-4">{GroupName}</h2>
           <p className="text-lg mb-4">{description}</p>
-          {/* <p className="text-lg mb-4">{members.length} Members</p> */}
+          <p className="text-lg mb-4">{members.length} Members</p>
 
           <Table className="w-full text-left">
             <TableHeader className="bg-gray-200">
@@ -167,12 +176,15 @@ const GroupCard: React.FC<GroupCardProps> = ({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {members.map((member, index) => (
-                <TableRow key={index} className="border-b last:border-none">
+              {members.map((member) => (
+                <TableRow
+                  key={member.user_id}
+                  className="border-b last:border-none"
+                >
                   <TableCell className="p-4">
                     <Avatar>
                       <AvatarImage
-                        src={member.profile_image}
+                        src={getImageUrl(member.profile_image)}
                         alt={member.name}
                       />
                       <AvatarFallback>{member.name.charAt(0)}</AvatarFallback>
@@ -184,7 +196,7 @@ const GroupCard: React.FC<GroupCardProps> = ({
                       variant="destructive"
                       onClick={() => handleDeleteMember(member.user_id)}
                     >
-                      Delete
+                      Remove
                     </Button>
                   </TableCell>
                 </TableRow>
@@ -194,12 +206,16 @@ const GroupCard: React.FC<GroupCardProps> = ({
 
           <div className="mt-4">
             <ComboboxDemo
-              options={members}
+              options={allMembers}
               selectedOptions={selectedMembers}
               handleMemberSelect={handleMemberSelect}
               handleMemberRemove={handleMemberRemove}
             />
-            <Button className="ml-2 mt-2" onClick={handleAddMember}>
+            <Button
+              className="ml-2 mt-2"
+              onClick={handleAddMember}
+              disabled={selectedMembers.length === 0}
+            >
               Add Member
             </Button>
           </div>

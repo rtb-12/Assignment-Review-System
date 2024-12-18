@@ -346,20 +346,54 @@ class AddGroupMemberView(generics.CreateAPIView):
 
     def create(self, request, group_id):
         user = request.user
+        groupID = request.data.get('groupID')
+        userID = request.data.get('userID')
+
         try:
-            group = GroupDetails.objects.get(groupID=group_id)
+            group = GroupDetails.objects.get(groupID=groupID)
+            user_to_add = UserDetails.objects.get(user_id=userID)
         except GroupDetails.DoesNotExist:
             return Response({"detail": "Group not found."}, status=status.HTTP_404_NOT_FOUND)
+        except UserDetails.DoesNotExist:
+            return Response({"detail": "User not found."}, status=status.HTTP_404_NOT_FOUND)
 
         workspace = group.workspace_id
 
-        if not WorkspaceMembers.objects.filter(workspace_id=workspace, user_id=user, workspace_role='2').exists():
-            return Response({"detail": "You do not have permission to add members to this group."}, status=status.HTTP_403_FORBIDDEN)
+        # Check if requesting user is workspace admin
+        if not WorkspaceMembers.objects.filter(
+            workspace_id=workspace,
+            user_id=user,
+            workspace_role='2'
+        ).exists():
+            return Response(
+                {"detail": "You do not have permission to add members to this group."},
+                status=status.HTTP_403_FORBIDDEN
+            )
 
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        serializer.save(groupID=group)
+        # Check if user to be added is a workspace member
+        if not WorkspaceMembers.objects.filter(
+            workspace_id=workspace,
+            user_id=user_to_add
+        ).exists():
+            return Response(
+                {"detail": "User is not a member of this workspace."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
+        # Check if user is already a group member
+        if GroupMembers.objects.filter(groupID=group, userID=user_to_add).exists():
+            return Response(
+                {"detail": "User is already a member of this group."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Create new group member
+        group_member = GroupMembers.objects.create(
+            groupID=group,
+            userID=user_to_add
+        )
+
+        serializer = self.get_serializer(group_member)
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
 

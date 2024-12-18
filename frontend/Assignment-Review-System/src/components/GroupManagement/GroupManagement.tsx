@@ -171,7 +171,15 @@ export const GroupManagement = () => {
       <div className="flex flex-wrap -mx-4">
         {groups.map((group) => (
           <div key={group.groupID} className="px-4 mb-8">
-            <GroupCard {...group} allMembers={members} />
+            <GroupCard
+              groupID={group.groupID}
+              GroupName={group.GroupName}
+              groupProfileImage={group.groupProfileImage}
+              description={group.description}
+              members={group.members || []} // Group members
+              allMembers={members} // All workspace members
+              workspace_id={group.workspace_id}
+            />
           </div>
         ))}
       </div>
