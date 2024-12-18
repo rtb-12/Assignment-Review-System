@@ -31,6 +31,10 @@ from .serializers import (AddGroupMemberSerializer, AssignmentCreateSerializer, 
                           UserProfileSerializer,
                           GroupCreateSerializer)
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 class OAuth2Handler:
     def __init__(self):
@@ -587,8 +591,13 @@ class LeaderboardView(generics.ListAPIView):
             workspace_id=workspace_id
         ).values_list('user_id', flat=True)
 
+        workspace_assignments = AssignmentDetails.objects.filter(
+            workspace_id=workspace_id
+        ).values_list('assignment_id', flat=True)
+
         leaderboard_data = AssignmentStatus.objects.filter(
-            user_id__in=user_ids
+            user_id__in=user_ids,
+            assignment_id__in=workspace_assignments
         ).select_related('user').values(
             'user__name',
             'user__profile_image'
@@ -616,38 +625,46 @@ class OngoingAssignmentsView(generics.ListAPIView):
 
     def get_queryset(self):
         user = self.request.user
+        workspace_id = self.kwargs.get('workspace_id')
         now = timezone.now()
 
-        # Check if the user is assigned any assignments with role value 1
-        assigned_assignments = AssignmentRoles.objects.filter(
-            user=user, role_id=1).values_list('assignment', flat=True)
-        if not assigned_assignments.exists():
-            return AssignmentStatus.objects.none()
+        try:
+            workspace = WorkspaceDetail.objects.get(workspace_id=workspace_id)
+        except WorkspaceDetail.DoesNotExist:
+            return AssignmentDetails.objects.none()
 
-        # Filter assignments where the deadline is not crossed
+        if not WorkspaceMembers.objects.filter(workspace_id=workspace, user_id=user).exists():
+            return AssignmentDetails.objects.none()
+
+        assigned_assignments = AssignmentRoles.objects.filter(
+            user=user,
+            role_id=1,
+            assignment__workspace_id=workspace
+        ).values_list('assignment', flat=True)
+
+        if not assigned_assignments.exists():
+            return AssignmentDetails.objects.none()
+
         ongoing_assignments = AssignmentStatus.objects.filter(
             user=user,
             assignment__deadline__gt=now,
-            assignment__in=assigned_assignments
+            assignment__in=assigned_assignments,
+            assignment__workspace_id=workspace
         ).select_related('assignment')
 
-        # Filter assignments where not all subtasks are completed
         filtered_assignments = set()
         for assignment_status in ongoing_assignments:
+            # Check if any subtask is not completed
             subtask_statuses = AssignmentStatus.objects.filter(
                 assignment=assignment_status.assignment,
                 user=user
             ).values_list('status', flat=True)
 
-            if 'completed' not in subtask_statuses:
+            # If any subtask is not 'completed', add to ongoing assignments
+            if any(status.lower() != 'completed' for status in subtask_statuses):
                 filtered_assignments.add(assignment_status.assignment)
 
         return list(filtered_assignments)
-
-    def list(self, request, *args, **kwargs):
-        queryset = self.get_queryset()
-        serializer = self.get_serializer(queryset, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class CompletedAssignmentsView(generics.ListAPIView):
@@ -657,23 +674,72 @@ class CompletedAssignmentsView(generics.ListAPIView):
 
     def get_queryset(self):
         user = self.request.user
+        workspace_id = self.kwargs.get('workspace_id')
+        logger.debug(f"Fetching completed assignments for user {
+                     user.user_id} in workspace {workspace_id}")
+
+        try:
+            workspace = WorkspaceDetail.objects.get(workspace_id=workspace_id)
+            logger.debug(f"Found workspace: {workspace.workspace_name}")
+        except WorkspaceDetail.DoesNotExist:
+            logger.error(f"Workspace {workspace_id} not found")
+            return AssignmentDetails.objects.none()
+
+        # Check if user is workspace member
+        is_member = WorkspaceMembers.objects.filter(
+            workspace_id=workspace, user_id=user).exists()
+        logger.debug(f"User is workspace member: {is_member}")
+        if not is_member:
+            logger.warning(
+                f"User {user.user_id} is not a member of workspace {workspace_id}")
+            return AssignmentDetails.objects.none()
+
+        # Get assignments where user is assigned with role value 1 (student)
+        assigned_assignments = AssignmentRoles.objects.filter(
+            user=user,
+            role_id=1,
+            assignment__workspace_id=workspace
+        ).values_list('assignment', flat=True)
+
+        logger.debug(
+            f"Found {assigned_assignments.count()} assigned assignments")
+        if not assigned_assignments.exists():
+            logger.debug("No assignments found for user")
+            return AssignmentDetails.objects.none()
 
         # Filter assignments where all subtasks are completed
-        completed_assignments = AssignmentStatus.objects.filter(
-            user=user
-        ).select_related('assignment')
-
         filtered_assignments = []
-        for assignment_status in completed_assignments:
+        for assignment_id in assigned_assignments:
+            logger.debug(f"Checking completion status for assignment {
+                         assignment_id}")
+
             subtask_statuses = AssignmentStatus.objects.filter(
-                assignment=assignment_status.assignment,
-                user=user
+                user=user,
+                assignment_id=assignment_id
             ).values_list('status', flat=True)
 
-            if all(status == 'completed' for status in subtask_statuses):
-                filtered_assignments.append(assignment_status)
+            logger.debug(f"Assignment {assignment_id} subtask statuses: {
+                         list(subtask_statuses)}")
 
-        return filtered_assignments
+            # Check if all subtasks are marked as "completed" (case-insensitive)
+            if subtask_statuses and all(status.lower() == 'completed' for status in subtask_statuses):
+                logger.debug(f"Assignment {assignment_id} is completed")
+                filtered_assignments.append(assignment_id)
+            else:
+                logger.debug(f"Assignment {assignment_id} is not completed")
+
+        logger.debug(f"Found {len(filtered_assignments)
+                              } completed assignments")
+
+        # Return the completed assignments
+        completed_assignments = AssignmentDetails.objects.filter(
+            assignment_id__in=filtered_assignments,
+            workspace_id=workspace
+        )
+        logger.debug(
+            f"Returning {completed_assignments.count()} completed assignments")
+
+        return completed_assignments
 
 
 class CrossedDeadlineAssignmentsView(generics.ListAPIView):

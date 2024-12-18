@@ -11,7 +11,7 @@ import { RootState } from "../../store/store";
 const fetchOngoingAssignments = async (workspaceId: string) => {
   try {
     const response = await axios.get(
-      `http://localhost:8000/api/ongoing-assignments/`,
+      `http://localhost:8000/api/ongoing-assignments/${workspaceId}/`,
       {
         headers: {
           Authorization: `Bearer ${Cookies.get("access")}`,
@@ -28,7 +28,7 @@ const fetchOngoingAssignments = async (workspaceId: string) => {
 const fetchDeadlineCrossedAssignments = async (workspaceId: string) => {
   try {
     const response = await axios.get(
-      `http://localhost:8000/api/crossed-deadline-assignments/`,
+      `http://localhost:8000/api/crossed-deadline-assignments/${workspaceId}/`,
       {
         headers: {
           Authorization: `Bearer ${Cookies.get("access")}`,
@@ -45,7 +45,7 @@ const fetchDeadlineCrossedAssignments = async (workspaceId: string) => {
 const fetchCompletedAssignments = async (workspaceId: string) => {
   try {
     const response = await axios.get(
-      `http://localhost:8000/api/completed-assignments/`,
+      `http://localhost:8000/api/completed-assignments/${workspaceId}/`,
       {
         headers: {
           Authorization: `Bearer ${Cookies.get("access")}`,
