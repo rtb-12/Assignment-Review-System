@@ -22,6 +22,8 @@ interface ComboboxDemoProps {
   selectedOptions: any[];
   handleMemberSelect: (member) => void;
   handleMemberRemove: (member) => void;
+  labelKey?: string;
+  valueKey?: string;
 }
 
 export function ComboboxDemo({
@@ -29,6 +31,8 @@ export function ComboboxDemo({
   selectedOptions,
   handleMemberSelect,
   handleMemberRemove,
+  labelKey = "name",
+  valueKey = "user_id",
 }: ComboboxDemoProps) {
   const [open, setOpen] = React.useState(false);
   const [value, setValue] = React.useState("");
@@ -60,14 +64,13 @@ export function ComboboxDemo({
             <CommandGroup>
               {options.map((person) => (
                 <CommandItem
-                  key={person.user_id}
+                  key={person[valueKey]}
                   onSelect={() => handleSelect(person)}
                   disabled={selectedOptions.some(
-                    (selectedPerson) =>
-                      selectedPerson.user_id === person.user_id
+                    (selected) => selected[valueKey] === person[valueKey]
                   )}
                 >
-                  {person.name}
+                  {person[labelKey]}
                   {selectedOptions.some(
                     (selectedPerson) =>
                       selectedPerson.user_id === person.user_id

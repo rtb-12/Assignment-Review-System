@@ -46,13 +46,24 @@ const AssignmentCreationPage = () => {
     profile_image: string;
     name: string;
   }
+  interface Group {
+    groupID: number;
+    GroupName: string;
+    members: {
+      name: string;
+      profile_image: string;
+      user_id: number;
+    }[];
+  }
+
   const generateUniqueId = () => {
     return `${Date.now()}-${Math.floor(Math.random() * 1000)}`;
   };
 
   const [selectedMembers, setSelectedMembers] = useState<Member[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
-  // const [groups, setGroups] = useState([]);
+  const [groups, setGroups] = useState([]);
+  const [selectedGroups, setSelectedGroups] = useState<Group[]>([]);
   const [assignmentName, setAssignmentName] = useState("");
   const [assignmentDescription, setAssignmentDescription] = useState("");
   const [files, setFiles] = useState<File[]>([]);
@@ -71,40 +82,43 @@ const AssignmentCreationPage = () => {
   );
 
   useEffect(() => {
-    if (!workspaceId && paramWorkspaceId) {
+    if (paramWorkspaceId) {
       dispatch(setWorkspaceId(paramWorkspaceId));
       workspaceId = paramWorkspaceId;
-
-      const fetchMembersAndGroups = async () => {
-        try {
-          const membersResponse = await fetch(
-            `http://localhost:8000/api/workspace/${workspaceId}/members/`,
-            {
-              headers: {
-                Authorization: `Bearer ${Cookies.get("access")}`,
-              },
-            }
-          );
-          const membersData = await membersResponse.json();
-          setMembers(membersData);
-
-          const groupsResponse = await fetch(
-            `http://localhost:8000/api/workspace/${workspaceId}/groups/`,
-            {
-              headers: {
-                Authorization: `Bearer ${Cookies.get("access")}`,
-              },
-            }
-          );
-          const groupsData = await groupsResponse.json();
-          setGroups(groupsData);
-        } catch (error) {
-          console.error("Error fetching members and groups:", error);
-        }
-      };
-
-      fetchMembersAndGroups();
     }
+
+    const fetchMembersAndGroups = async () => {
+      if (!workspaceId) return;
+
+      try {
+        const membersResponse = await axios.get(
+          `http://localhost:8000/api/workspace/${workspaceId}/members/`,
+          {
+            headers: {
+              Authorization: `Bearer ${Cookies.get("access")}`,
+            },
+          }
+        );
+        setMembers(membersResponse.data);
+        const groupsResponse = await fetch(
+          `http://localhost:8000/api/workspace/${workspaceId}/groups/`,
+          {
+            headers: {
+              Authorization: `Bearer ${Cookies.get("access")}`,
+            },
+          }
+        );
+        const groupsData = await groupsResponse.json();
+        setGroups(groupsData);
+
+        // Log for debugging
+        console.log("Fetched members:", membersResponse.data);
+      } catch (error) {
+        console.error("Error fetching members:", error);
+      }
+    };
+
+    fetchMembersAndGroups();
   }, [workspaceId, paramWorkspaceId, dispatch]);
 
   const handleSubtaskChange = (index, field, value) => {
@@ -120,6 +134,17 @@ const AssignmentCreationPage = () => {
     ]);
   };
 
+  const resetForm = () => {
+    setAssignmentName("");
+    setAssignmentDescription("");
+    setSelectedMembers([]);
+    setSelectedGroups([]);
+    setFiles([]);
+    setSubtasks([
+      { subtask_id: generateUniqueId(), description: "", points: "" },
+    ]);
+    setDeadline(null);
+  };
   const handleMemberSelect = (member) => {
     console.log("Selected member:", member);
     setSelectedMembers((prevMembers) => [...prevMembers, member]);
@@ -128,6 +153,25 @@ const AssignmentCreationPage = () => {
   const handleMemberRemove = (member) => {
     setSelectedMembers((prevMembers) =>
       prevMembers.filter((prevMember) => prevMember.user_id !== member.user_id)
+    );
+  };
+  const handleGroupSelect = (group: Group) => {
+    console.log("Selected group:", group);
+    setSelectedGroups((prevGroups) => [...prevGroups, group]);
+
+    // Add all group members to selectedMembers if they're not already selected
+    group.members.forEach((member) => {
+      if (
+        !selectedMembers.some((selected) => selected.user_id === member.user_id)
+      ) {
+        setSelectedMembers((prevMembers) => [...prevMembers, member]);
+      }
+    });
+  };
+
+  const handleGroupRemove = (group: Group) => {
+    setSelectedGroups((prevGroups) =>
+      prevGroups.filter((prevGroup) => prevGroup.groupID !== group.groupID)
     );
   };
 
@@ -144,8 +188,14 @@ const AssignmentCreationPage = () => {
     formData.append("deadline", deadline ? deadline.toISOString() : null);
     formData.append("subtask_details", JSON.stringify(subtaskDetails));
 
+    // Add individual members
     selectedMembers.forEach((member) => {
       formData.append("individual_members", member.user_id);
+    });
+
+    // Add group IDs
+    selectedGroups.forEach((group) => {
+      formData.append("group_ids", group.groupID.toString());
     });
 
     files.forEach((file) => {
@@ -171,6 +221,8 @@ const AssignmentCreationPage = () => {
       );
 
       if (response.status === 201) {
+        alert("Assignment created successfully!");
+        resetForm();
         console.log("Assignment created successfully!");
       } else {
         console.log("Error creating assignment!");
@@ -255,7 +307,48 @@ const AssignmentCreationPage = () => {
       <div className="w-1/4">
         <h2 className="text-lg font-bold">Overall Deadline</h2>
         <DatePickerWithPresets setDate={setDeadline} />
+        {/* Group Selection */}
+        <h2 className="text-lg font-bold mt-4">Assign Groups</h2>
+        <ComboboxDemo
+          options={groups}
+          selectedOptions={selectedGroups}
+          handleMemberSelect={handleGroupSelect}
+          handleMemberRemove={handleGroupRemove}
+          labelKey="GroupName"
+          valueKey="groupID"
+        />
 
+        {/* Selected Groups Table */}
+        <h2 className="text-lg font-bold mt-4">Assigned Groups</h2>
+        <div className="overflow-y-scroll h-[17rem] mt-2 border border-gray-300 rounded mb-4">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>S.No</TableHead>
+                <TableHead>Name</TableHead>
+                <TableHead>Members</TableHead>
+                <TableHead>Action</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {selectedGroups.map((group, index) => (
+                <TableRow key={group.groupID}>
+                  <TableCell>{index + 1}</TableCell>
+                  <TableCell>{group.GroupName}</TableCell>
+                  <TableCell>{group.members.length}</TableCell>
+                  <TableCell>
+                    <Button
+                      className="bg-red-500 text-white"
+                      onClick={() => handleGroupRemove(group)}
+                    >
+                      Delete
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
         {/* Assign Members */}
         <h2 className="text-lg font-bold mt-4">Assign Members</h2>
         <ComboboxDemo
@@ -263,6 +356,8 @@ const AssignmentCreationPage = () => {
           selectedOptions={selectedMembers}
           handleMemberSelect={handleMemberSelect}
           handleMemberRemove={handleMemberRemove}
+          labelKey="name"
+          valueKey="user_id"
         />
 
         {/* Selected Members Table */}

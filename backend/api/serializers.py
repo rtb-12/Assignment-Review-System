@@ -170,7 +170,11 @@ class AssignmentCreateSerializer(serializers.ModelSerializer):
             setattr(instance, attr, value)
 
         if attachments is not None:
-            instance.attachments = attachments
+            instance.attachments = []
+            # Save new attachments
+            for attachment in attachments:
+                relative_path = self.save_attachment(attachment)
+                instance.attachments.append(relative_path)
 
         if subtask_details is not None:
             instance.subtask_details = subtask_details
@@ -189,9 +193,12 @@ class AssignmentCreateSerializer(serializers.ModelSerializer):
         assignment = AssignmentDetails.objects.create(
             assignor=assignor, workspace_id=workspace, **validated_data)
 
+        assignment.attachments = []
+
+        # Save attachments with sanitized filenames
         for attachment in attachments:
-            file_path = self.save_attachment(attachment)
-            assignment.attachments.append(file_path)
+            relative_path = self.save_attachment(attachment)
+            assignment.attachments.append(relative_path)
 
         assignment.subtask_details = subtask_details
         assignment.save()
@@ -232,9 +239,17 @@ class AssignmentCreateSerializer(serializers.ModelSerializer):
         return assignment
 
     def save_attachment(self, attachment):
-        path = os.path.join(settings.MEDIA_ROOT, attachment.name)
-        default_storage.save(path, ContentFile(attachment.read()))
-        return path
+        # Sanitize filename
+        original_name = attachment.name
+        filename = ''.join(
+            e for e in original_name if e.isalnum() or e in '._-')
+
+        # Create a relative path in assignments folder
+        relative_path = f'assignments/{filename}'
+
+        # Save using default storage
+        saved_path = default_storage.save(relative_path, attachment)
+        return saved_path
 
 
 class AssignmentSubmissionSerializer(serializers.ModelSerializer):
@@ -250,11 +265,9 @@ class AssignmentSubmissionSerializer(serializers.ModelSerializer):
         submission_attachments = validated_data.pop(
             'submission_attachments', [])
 
-        # Update basic fields
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
 
-        # Save attachments
         instance.submission_attachments = []
         for attachment in submission_attachments:
             relative_path = self.save_attachment(attachment)
@@ -264,18 +277,11 @@ class AssignmentSubmissionSerializer(serializers.ModelSerializer):
         return instance
 
     def save_attachment(self, attachment):
-        # Generate safe filename
         original_name = attachment.name
         filename = ''.join(
             e for e in original_name if e.isalnum() or e in '._-')
-
-        # Create relative path from MEDIA_ROOT
         relative_path = f'submissions/{filename}'
-
-        # Save file using default storage
         saved_path = default_storage.save(relative_path, attachment)
-
-        # Return path relative to MEDIA_ROOT
         return saved_path
 
 

@@ -477,15 +477,37 @@ class CreateAssignment(generics.CreateAPIView):
         if not WorkspaceMembers.objects.filter(workspace_id=workspace, user_id=user).exists():
             return Response({"detail": "You are not a member of this workspace."}, status=status.HTTP_403_FORBIDDEN)
 
-        individual_members = request.data.getlist('individual_members')
+        # Get individual members and group IDs from request
+        individual_members = request.data.getlist('individual_members', [])
+        group_ids = request.data.getlist('group_ids', [])
 
-        assignment_serializer = self.get_serializer(data=data, context={
-                                                    'workspace_id': workspace_id, 'request': request, 'individual_members': individual_members})
+        # Get all members from the specified groups
+        group_members = []
+        for group_id in group_ids:
+            try:
+                members = GroupMembers.objects.filter(
+                    groupID=group_id
+                ).values_list('userID', flat=True)
+                group_members.extend(list(members))
+            except Exception as e:
+                logger.error(f"Error fetching members for group {
+                             group_id}: {e}")
+
+        all_members = list(set(individual_members + group_members))
+
+        assignment_serializer = self.get_serializer(
+            data=data,
+            context={
+                'workspace_id': workspace_id,
+                'request': request,
+                'individual_members': all_members
+            }
+        )
+
         if not assignment_serializer.is_valid():
             return Response(assignment_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         assignment_serializer.save()
-
         return Response(assignment_serializer.data, status=status.HTTP_201_CREATED)
 
 

@@ -37,6 +37,7 @@ const OAuthCallback = () => {
             );
 
             navigate("/workspace");
+            window.location.reload();
           } else {
             console.error("Failed to obtain tokens:", data);
           }

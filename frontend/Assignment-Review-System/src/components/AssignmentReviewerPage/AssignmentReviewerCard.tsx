@@ -174,101 +174,238 @@ const AssignmentReviewerCard = () => {
   return (
     <div className="flex h-screen bg-gray-100 dark:bg-gray-900">
       {/* Main Content */}
-      <div className="flex-1 p-4">
+      <div className="flex-1 p-6">
         {/* Header */}
-        <div className="flex items-center justify-between mb-4">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-50">
-            {isEditing ? (
-              <Input
-                value={editedAssignment.assignment_name}
-                onChange={(e) =>
-                  handleInputChange("assignment_name", e.target.value)
-                }
-                className="w-full mb-2"
-              />
-            ) : (
-              assignment.assignment_name
-            )}
-          </h1>
+        <div className="flex items-center justify-between mb-6 bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-50">
+              {isEditing ? (
+                <Input
+                  value={editedAssignment.assignment_name}
+                  onChange={(e) =>
+                    handleInputChange("assignment_name", e.target.value)
+                  }
+                  className="w-full"
+                />
+              ) : (
+                assignment.assignment_name
+              )}
+            </h1>
+            <div className="flex items-center mt-2 text-gray-600 dark:text-gray-400">
+              <div className="flex items-center mr-4">
+                <svg
+                  className="w-5 h-5 mr-2"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                  />
+                </svg>
+                <span>Assigned by: {assignment.assignor.name}</span>
+              </div>
+              <div className="flex items-center">
+                <svg
+                  className="w-5 h-5 mr-2"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                  />
+                </svg>
+                <span>
+                  Due: {new Date(assignment.deadline).toLocaleDateString()}
+                </span>
+              </div>
+            </div>
+          </div>
           <Button
             onClick={handleEditToggle}
-            className="bg-blue-500 text-white px-4 py-2 rounded"
+            className={`${
+              isEditing
+                ? "bg-green-500 hover:bg-green-600"
+                : "bg-blue-500 hover:bg-blue-600"
+            } text-white px-6 py-2 rounded-lg transition-colors duration-200`}
           >
-            {isEditing ? "Update" : "Edit"}
+            {isEditing ? "Save Changes" : "Edit Assignment"}
           </Button>
         </div>
 
-        {/* Description */}
-        <div className="mb-4">
-          <h2 className="text-xl font-bold text-gray-900 dark:text-gray-50 mb-2">
-            Description
-          </h2>
-          {isEditing ? (
-            <Textarea
-              value={editedAssignment.assignment_description}
-              onChange={(e) =>
-                handleInputChange("assignment_description", e.target.value)
-              }
-              className="w-full mb-2"
-            />
-          ) : (
-            <p className="text-gray-700 dark:text-gray-300">
-              {assignment.assignment_description}
-            </p>
-          )}
+        {/* Main Content Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Description Card */}
+          <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-gray-50 mb-4 flex items-center">
+              <svg
+                className="w-6 h-6 mr-2"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 6h16M4 12h16M4 18h7"
+                />
+              </svg>
+              Description
+            </h2>
+            {isEditing ? (
+              <Textarea
+                value={editedAssignment.assignment_description}
+                onChange={(e) =>
+                  handleInputChange("assignment_description", e.target.value)
+                }
+                className="min-h-[200px] w-full"
+              />
+            ) : (
+              <div className="prose dark:prose-invert max-w-none">
+                {assignment.assignment_description}
+              </div>
+            )}
+          </div>
+
+          {/* Attachments Card */}
+          <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-gray-50 mb-4 flex items-center">
+              <svg
+                className="w-6 h-6 mr-2"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"
+                />
+              </svg>
+              Attachments
+            </h2>
+            {isEditing ? (
+              <div className="space-y-4">
+                {editedAssignment.attachments.map((file, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
+                  >
+                    <a
+                      href={file}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-500 hover:text-blue-600 truncate flex-1"
+                    >
+                      {file.split("/").pop()}
+                    </a>
+                    <Button
+                      onClick={() => handleFileDelete(file)}
+                      className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-md ml-2"
+                    >
+                      Remove
+                    </Button>
+                  </div>
+                ))}
+                <FileUploadCreation
+                  setFiles={setNewFiles}
+                  newFiles={newFiles}
+                />
+              </div>
+            ) : (
+              <div className="grid gap-2">
+                {assignment.attachments.map((file, index) => (
+                  <a
+                    key={index}
+                    href={file}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors duration-200"
+                  >
+                    <svg
+                      className="w-5 h-5 mr-3 text-gray-500"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"
+                      />
+                    </svg>
+                    <span className="text-blue-500 hover:text-blue-600">
+                      {file.split("/").pop()}
+                    </span>
+                  </a>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Deadline */}
-        <div className="mb-4">
-          <h2 className="text-xl font-bold text-gray-900 dark:text-gray-50 mb-2">
-            Deadline
-          </h2>
-          {isEditing ? (
-            <Input
-              type="datetime-local"
-              value={editedAssignment.deadline}
-              onChange={(e) => handleInputChange("deadline", e.target.value)}
-              className="w-full mb-2"
-            />
-          ) : (
-            <p className="text-gray-700 dark:text-gray-300">
-              {assignment.deadline}
-            </p>
-          )}
-        </div>
-
-        {/* Subtasks */}
-        <div className="mb-4">
-          <h2 className="text-xl font-bold text-gray-900 dark:text-gray-50 mb-2">
+        {/* Subtasks Section */}
+        <div className="mt-6 bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm">
+          <h2 className="text-xl font-bold text-gray-900 dark:text-gray-50 mb-4 flex items-center">
+            <svg
+              className="w-6 h-6 mr-2"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+              />
+            </svg>
             Subtasks
           </h2>
           {isEditing ? (
-            <div>
+            <div className="space-y-4">
               {editedAssignment.subtask_details.map((subtask, index) => (
                 <div
                   key={subtask.subtask_id}
-                  className="flex items-center mb-2"
+                  className="flex items-center gap-4 bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm"
                 >
-                  <Input
-                    value={subtask.description}
-                    onChange={(e) =>
-                      handleSubtaskChange(index, "description", e.target.value)
-                    }
-                    placeholder="Subtask Description"
-                    className="mr-2 flex-grow"
-                  />
-                  <Input
-                    value={subtask.points}
-                    onChange={(e) =>
-                      handleSubtaskChange(index, "points", e.target.value)
-                    }
-                    placeholder="Points"
-                    type="number"
-                    className="mr-2 w-24"
-                  />
+                  <div className="flex-grow space-y-2">
+                    <Input
+                      value={subtask.description}
+                      onChange={(e) =>
+                        handleSubtaskChange(
+                          index,
+                          "description",
+                          e.target.value
+                        )
+                      }
+                      placeholder="Subtask Description"
+                      className="w-full"
+                    />
+                    <Input
+                      value={subtask.points}
+                      onChange={(e) =>
+                        handleSubtaskChange(index, "points", e.target.value)
+                      }
+                      placeholder="Points"
+                      type="number"
+                      className="w-32"
+                    />
+                  </div>
                   <Button
                     onClick={() => handleSubtaskDelete(index)}
-                    className="bg-red-500 text-white px-4 py-2 rounded"
+                    variant="destructive"
+                    className="bg-red-500 hover:bg-red-600 text-white"
                   >
                     Delete
                   </Button>
@@ -276,73 +413,40 @@ const AssignmentReviewerCard = () => {
               ))}
               <Button
                 onClick={addSubtask}
-                className="bg-green-500 text-white px-4 py-2 rounded"
+                className="bg-green-500 hover:bg-green-600 text-white"
               >
-                Add Subtask
+                + Add Subtask
               </Button>
             </div>
           ) : (
-            <ul className="list-disc ml-5">
+            <div className="space-y-2">
               {assignment.subtask_details.map((subtask) => (
-                <li key={subtask.subtask_id}>
-                  {subtask.description} - {subtask.points} points
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-
-        {/* Attachments */}
-        <div className="mb-4">
-          <h2 className="text-xl font-bold text-gray-900 dark:text-gray-50 mb-2">
-            Attachments
-          </h2>
-          {isEditing ? (
-            <div>
-              {editedAssignment.attachments.map((file, index) => (
-                <div key={index} className="flex items-center">
-                  <a
-                    href={file}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-500 underline mr-2"
-                  >
-                    {file.split("/").pop()}
-                  </a>
-                  <Button
-                    onClick={() => handleFileDelete(file)}
-                    className="bg-red-500 text-white px-4 py-2 rounded"
-                  >
-                    Remove
-                  </Button>
+                <div
+                  key={subtask.subtask_id}
+                  className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm"
+                >
+                  <p className="font-medium text-gray-900 dark:text-gray-100">
+                    {subtask.description}
+                  </p>
+                  <p className="text-m text-gray-600 dark:text-gray-400">
+                    Points: {subtask.points}
+                  </p>
                 </div>
               ))}
-              <FileUploadCreation setFiles={setNewFiles} newFiles={newFiles} />
             </div>
-          ) : (
-            <ul className="list-disc ml-5">
-              {assignment.attachments.map((file, index) => (
-                <li key={index}>
-                  <a
-                    href={file}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-500 underline"
-                  >
-                    {file.split("/").pop()}
-                  </a>
-                </li>
-              ))}
-            </ul>
           )}
         </div>
 
-        {/* Tabs */}
-        <TabsAssignmentReview />
+        {/* Tabs Section */}
+        <div className="mt-6">
+          <TabsAssignmentReview />
+        </div>
       </div>
 
-      {/* Chat */}
-      <GlobalChatAssignment />
+      {/* Chat Section */}
+      <div className="w-1/4 border-l border-gray-200 dark:border-gray-700">
+        <GlobalChatAssignment />
+      </div>
     </div>
   );
 };
